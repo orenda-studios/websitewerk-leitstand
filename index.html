@@ -2557,10 +2557,32 @@ _renderFinDash(d){
  }
  const cl=(d.clients||[]).filter(c=>c.income>0||c.expense>0);
  if(cl.length){
-  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px"><b style="font-size:13px">Je Kunde — Einnahmen · Kosten · Marge</b>
+  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px;margin-bottom:12px"><b style="font-size:13px">Je Kunde — Einnahmen · Kosten · Marge</b>
     <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px"><thead><tr style="text-align:left;color:#9AA4AC;text-transform:uppercase;font-size:10px"><th style="padding:5px 4px">Kunde</th><th style="text-align:right">Einn.</th><th style="text-align:right">Kosten</th><th style="text-align:right">Marge</th></tr></thead><tbody>
     ${cl.map(c=>`<tr style="border-top:1px solid #EAEEF0"><td style="padding:6px 4px">${esc(c.name)}</td><td style="text-align:right;color:var(--g)">${fmt(c.income)} €</td><td style="text-align:right;color:var(--amb)">${fmt(c.expense)} €</td><td style="text-align:right;font-weight:700;color:${col(c.margin)}">${fmt(c.margin)} €</td></tr>`).join("")}
     </tbody></table></div>`;
+ }
+ const mo=d.monthly||[],mn=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+ if(mo.some(x=>x.income>0||x.expense>0)){
+  const mx=Math.max(1,...mo.map(x=>Math.max(x.income,x.expense)));
+  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px;margin-bottom:12px"><b style="font-size:13px">Verlauf ${new Date().getFullYear()} — Einnahmen vs. Ausgaben</b>
+    <div style="display:flex;align-items:flex-end;gap:5px;margin-top:10px">${mo.map((x,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px" title="${mn[i]}: +${fmt(x.income)} € / −${fmt(x.expense)} €"><div style="display:flex;align-items:flex-end;gap:2px;height:96px"><div style="width:7px;background:var(--g);height:${Math.round(x.income/mx*94)}px;border-radius:2px 2px 0 0"></div><div style="width:7px;background:var(--amb);height:${Math.round(x.expense/mx*94)}px;border-radius:2px 2px 0 0"></div></div><div style="font-size:9px;color:#9AA4AC">${mn[i]}</div></div>`).join("")}</div>
+    <div style="display:flex;gap:14px;font-size:11px;color:#9AA4AC;margin-top:8px"><span><span style="display:inline-block;width:9px;height:9px;background:var(--g);border-radius:2px"></span> Einnahmen</span><span><span style="display:inline-block;width:9px;height:9px;background:var(--amb);border-radius:2px"></span> Ausgaben</span></div>
+  </div>`;
+ }
+ const abo=d.recurringList||[];
+ if(abo.length){
+  const today=new Date().toISOString().slice(0,10);
+  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px;margin-bottom:12px"><b style="font-size:13px">🔁 Laufende Abos & Fixkosten (${abo.length}) · ${fmt(abo.reduce((s,a)=>s+(a.perYear||0),0))} €/Jahr</b>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px"><thead><tr style="text-align:left;color:#9AA4AC;text-transform:uppercase;font-size:10px"><th style="padding:5px 4px">Posten</th><th style="text-align:right">Betrag</th><th style="text-align:right">Nächste Fälligkeit</th><th style="text-align:right">/Jahr</th></tr></thead><tbody>
+    ${abo.map(a=>{const soon=a.nextDue&&a.nextDue<=new Date(Date.now()+7*864e5).toISOString().slice(0,10);return `<tr style="border-top:1px solid #EAEEF0"><td style="padding:6px 4px">${esc(a.category)}${a.vendor?' · '+esc(a.vendor):''}${a.clientName?' · 👤 '+esc(a.clientName):''}</td><td style="text-align:right">${fmt(a.amount)} € / ${a.recurring==='monatlich'?'Mon':'Jahr'}</td><td style="text-align:right;${soon?'color:var(--amb);font-weight:700':''}">${a.nextDue||'—'}</td><td style="text-align:right;color:#9AA4AC">${fmt(a.perYear)} €</td></tr>`;}).join("")}
+    </tbody></table></div>`;
+ }
+ const bel=(d.expenses||[]).filter(e=>e.receiptUrl);
+ if(bel.length){
+  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px"><b style="font-size:13px">📎 Belege (${bel.length})</b>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">${bel.map(e=>{const img=/\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(e.receiptUrl);return `<a href="${esc(e.receiptUrl)}" target="_blank" rel="noopener" title="${esc(e.date||'')} · ${fmt(e.amount)} € · ${esc(e.category||'')}" style="width:62px;height:62px;border:1px solid #E3E8EA;border-radius:6px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;text-decoration:none;color:var(--muted)">${img?`<img src="${esc(e.receiptUrl)}" style="width:100%;height:100%;object-fit:cover" alt="Beleg" loading="lazy">`:'📄'}</a>`;}).join("")}</div>
+  </div>`;
  }
  dash.innerHTML=h;
 },
