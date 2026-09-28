@@ -2440,6 +2440,11 @@ rFinanzen(){
    <p class="hint" style="margin-bottom:10px">Aus den im System erfassten Rechnungen (${invs.length}). Für die volle Buchhaltung (Ausgaben erfassen + EÜR) kommt als Nächstes ein eigener Block.</p>
    <div style="display:flex;gap:10px;flex-wrap:wrap">${kpi("Bezahlt "+yr,fmt(paidYr)+" €","var(--g)")}${kpi("Bezahlt gesamt",fmt(paidSum)+" €")}${kpi("Offen",fmt(openSum)+" €",openSum>0?"var(--amb)":"")}${kpi("MRR (Care)",fmt(mrr)+" €")}</div>
   </div></div>
+  <div class="panel"><div class="cfg-sec">
+   <div class="stit" style="color:var(--a);font-size:11px">📊 FINANZ-DASHBOARD — AUF EINEN BLICK</div>
+   <p class="hint" style="margin-bottom:10px">Cashflow, laufende Kosten, Rücklagen und §19-Status — live berechnet. Ausgaben unten pflegen.</p>
+   <div id="fin-dash" style="font-size:13px;color:var(--muted)">Lade …</div>
+  </div></div>
   ${openInv.length?`<div class="panel"><div class="cfg-sec">
    <div class="stit" style="color:var(--a);font-size:11px">🧾 OFFENE RECHNUNGEN · ${openInv.length} · ${fmt(openSum)} €</div>
    <p class="hint" style="margin-bottom:8px">Noch nicht bezahlt — Klick öffnet den Kunden. Überfällig (&gt;14 Tage) rot.</p>
@@ -2461,7 +2466,12 @@ rFinanzen(){
     <div class="mf"><label>Kategorie</label><select id="ex-cat" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px">${["Software/Tools","Hosting/Domains","KI/API-Guthaben","Werbung/Akquise","Büro/Material","Gebühren/Bank","Fortbildung","Reise/Fahrt","Steuer/Beratung","Sonstiges"].map(x=>`<option>${x}</option>`).join("")}</select></div>
     <div class="mf"><label>Anbieter (optional)</label><input id="ex-vendor" placeholder="z. B. Render, OpenAI, Cloudflare"></div>
    </div>
+   <div class="cfg-g2">
+    <div class="mf"><label>Wiederkehr</label><select id="ex-rec" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"><option value="einmalig">Einmalig</option><option value="monatlich">Monatlich</option><option value="jaehrlich">Jährlich</option></select></div>
+    <div class="mf"><label>Kunde zuordnen (optional)</label><select id="ex-client" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"><option value="">— keiner (allgemein) —</option>${(this.state.clients||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+   </div>
    <div class="mf"><label>Notiz (optional)</label><input id="ex-note" placeholder="Verwendungszweck"></div>
+   <div class="mf"><label>Beleg (optional — Bild/PDF)</label><input id="ex-receipt" type="file" accept="image/*,application/pdf" style="font-size:12px"></div>
    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:2px"><button class="btn bi" onclick="App.addExpense()">+ Ausgabe erfassen</button><button class="btn bg" onclick="App.exportFinanceCSV()" title="Ausgaben + EÜR als CSV (Excel/Steuerberater)">⬇ CSV-Export</button></div>
    <div id="ex-msg" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
    <div id="fin-explist" style="margin-top:14px;font-size:13px;color:var(--muted)"></div>
@@ -2509,8 +2519,54 @@ rFinanzen(){
  this.loadAgencyProfile();
  this.loadFinance();
 },
+_renderFinDash(d){
+ const dash=document.getElementById("fin-dash"); if(!dash)return;
+ const col=n=>(+n>=0)?'var(--g)':'var(--red)';
+ const tile=(l,v,c,sub)=>`<div class="hst" style="min-width:150px;flex:1"><div class="hl">${l}</div><div class="hv"${c?` style="color:${c}"`:""}>${v}</div>${sub?`<div style="font-size:11px;color:#9AA4AC;margin-top:2px">${sub}</div>`:""}</div>`;
+ const tm=d.thisMonth||{},ty=d.thisYear||{},rr={m:d.runRateMonthly||0,y:d.runRateYearly||0},rv=d.reserves||{},ku=d.ku||{};
+ let h=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+   ${tile("Diesen Monat",fmt(tm.profit||0)+" €",col(tm.profit||0),"↑ "+fmt(tm.income||0)+" · ↓ "+fmt(tm.expense||0))}
+   ${tile("Dieses Jahr",fmt(ty.profit||0)+" €",col(ty.profit||0),"↑ "+fmt(ty.income||0)+" · ↓ "+fmt(ty.expense||0))}
+   ${tile("Laufende Kosten",fmt(rr.m)+" €/M",'var(--amb)',fmt(rr.y)+" €/Jahr")}
+   ${tile("Frei verfügbar",fmt(rv.available||0)+" €",col(rv.available||0),"n. Rücklagen")}
+  </div>`;
+ const stC={ok:'var(--g)',warnung:'var(--amb)',ueber:'var(--red)'}[ku.status]||'#9AA4AC';
+ const stT={ok:'Alles im grünen Bereich',warnung:'Nähert sich der Grenze',ueber:'Grenze überschritten — Regelbesteuerung prüfen!'}[ku.status]||'—';
+ const bar=(val,max,c)=>{const p=Math.max(0,Math.min(100,Math.round((val/(max||1))*100)));return `<div style="background:#EAEEF0;border-radius:6px;height:9px;overflow:hidden;margin:3px 0"><div style="width:${p}%;height:100%;background:${c}"></div></div><div style="font-size:11px;color:#9AA4AC">${fmt(val)} € von ${fmt(max)} € (${p}%)</div>`;};
+ h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px;margin-bottom:12px">
+   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="width:12px;height:12px;border-radius:50%;background:${stC};display:inline-block"></span><b style="font-size:13px">§19 Kleinunternehmer: ${stT}</b></div>
+   <div style="font-size:12px;margin-top:4px">Laufendes Jahr (Grenze ${fmt(ku.limitCur||100000)} €)</div>${bar(ku.currentYearIncome||0,ku.limitCur||100000,stC)}
+   <div style="font-size:12px;margin-top:6px">Vorjahr (Grenze ${fmt(ku.limitPrev||25000)} €)</div>${bar(ku.prevYearIncome||0,ku.limitPrev||25000,stC)}
+  </div>`;
+ h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px;margin-bottom:12px">
+   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px"><b style="font-size:13px">💰 Rücklagen (Jahresgewinn ${fmt(rv.yearProfit||0)} €)</b>
+    <span style="font-size:12px;color:#6b7680">Steuer <input id="fin-taxpct" type="number" min="0" max="60" value="${rv.taxPct!=null?rv.taxPct:30}" style="width:50px;border:1px solid #CBD2D6;border-radius:5px;padding:3px 5px;font-size:12px"> % · USt <input id="fin-ustpct" type="number" min="0" max="25" value="${rv.ustPct!=null?rv.ustPct:0}" style="width:50px;border:1px solid #CBD2D6;border-radius:5px;padding:3px 5px;font-size:12px"> % <button class="btn bg bsm" onclick="App.saveFinanceSettings()">setzen</button></span></div>
+   <div style="display:flex;gap:10px;flex-wrap:wrap">${tile("Steuer zurücklegen",fmt(rv.taxReserve||0)+" €",'var(--amb)')}${tile("USt-Rücklage",fmt(rv.ustReserve||0)+" €",'var(--amb)')}${tile("Frei verfügbar",fmt(rv.available||0)+" €",col(rv.available||0))}</div>
+   <div style="font-size:11px;color:#9AA4AC;margin-top:6px">Leg den Steueranteil deines Gewinns beiseite. USt-% erst relevant beim Wechsel zur Regelbesteuerung.</div>
+  </div>`;
+ const cats=Object.entries(d.byCat||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+ if(cats.length){
+  const tot=cats.reduce((s,[,v])=>s+v,0)||1;
+  const pal=['#c99a45','#7BA7BC','#8FBF9F','#C58B8B','#9B8FBF','#BFB08F','#8FBFB0','#B0A0A0','#A0B0C0','#C0A080'];
+  let acc=0;const segs=cats.map(([,v],i)=>{const f=acc/tot*360;acc+=v;return `${pal[i%pal.length]} ${f}deg ${acc/tot*360}deg`;}).join(",");
+  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px;margin-bottom:12px"><b style="font-size:13px">Ausgaben nach Kategorie</b>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px">
+     <div style="width:118px;height:118px;border-radius:50%;background:conic-gradient(${segs});flex:none;position:relative"><div style="position:absolute;inset:26px;background:#f6f8f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${fmt(tot)} €</div></div>
+     <div style="flex:1;min-width:190px">${cats.map(([k,v],i)=>`<div style="display:flex;align-items:center;gap:7px;font-size:12px;padding:2px 0"><span style="width:10px;height:10px;border-radius:2px;background:${pal[i%pal.length]};flex:none"></span><span style="flex:1">${esc(k)}</span><b>${fmt(v)} €</b><span style="color:#9AA4AC;width:38px;text-align:right">${Math.round(v/tot*100)}%</span></div>`).join("")}</div>
+    </div></div>`;
+ }
+ const cl=(d.clients||[]).filter(c=>c.income>0||c.expense>0);
+ if(cl.length){
+  h+=`<div style="background:#f6f8f9;border-radius:8px;padding:12px"><b style="font-size:13px">Je Kunde — Einnahmen · Kosten · Marge</b>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px"><thead><tr style="text-align:left;color:#9AA4AC;text-transform:uppercase;font-size:10px"><th style="padding:5px 4px">Kunde</th><th style="text-align:right">Einn.</th><th style="text-align:right">Kosten</th><th style="text-align:right">Marge</th></tr></thead><tbody>
+    ${cl.map(c=>`<tr style="border-top:1px solid #EAEEF0"><td style="padding:6px 4px">${esc(c.name)}</td><td style="text-align:right;color:var(--g)">${fmt(c.income)} €</td><td style="text-align:right;color:var(--amb)">${fmt(c.expense)} €</td><td style="text-align:right;font-weight:700;color:${col(c.margin)}">${fmt(c.margin)} €</td></tr>`).join("")}
+    </tbody></table></div>`;
+ }
+ dash.innerHTML=h;
+},
 _renderFinance(d){
  this._finance=d;
+ this._renderFinDash(d);
  const eur=document.getElementById("fin-euer"),list=document.getElementById("fin-explist");
  if(eur){
   const rows=(d.euer||[]);
@@ -2518,7 +2574,7 @@ _renderFinance(d){
  }
  if(list){
   const exp=(d.expenses||[]);
-  list.innerHTML='<div style="font-size:11px;text-transform:uppercase;color:#9AA4AC;margin-bottom:6px">Erfasste Ausgaben ('+exp.length+') · gesamt '+fmt(d.totalExpense||0)+' €</div>'+(exp.length?exp.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #EAEEF0"><div style="flex:none;width:82px;color:#9AA4AC;font-size:12px">${esc(e.date||"")}</div><div style="flex:1;min-width:0"><b>${fmt(e.amount)} €</b> · ${esc(e.category||"")}${e.vendor?' · '+esc(e.vendor):''}${e.note?`<div style="font-size:12px;color:#9AA4AC">${esc(e.note)}</div>`:''}</div><button class="btn bg bsm" title="Löschen" onclick="App.delExpense('${e.id}')" style="flex:none">✕</button></div>`).join(""):'<div style="color:#9AA4AC">Noch keine Ausgaben erfasst.</div>');
+  list.innerHTML='<div style="font-size:11px;text-transform:uppercase;color:#9AA4AC;margin-bottom:6px">Erfasste Ausgaben ('+exp.length+') · gesamt '+fmt(d.totalExpense||0)+' €</div>'+(exp.length?exp.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #EAEEF0"><div style="flex:none;width:82px;color:#9AA4AC;font-size:12px">${esc(e.date||"")}</div><div style="flex:1;min-width:0"><b>${fmt(e.amount)} €</b> · ${esc(e.category||"")}${e.vendor?' · '+esc(e.vendor):''}${e.recurring&&e.recurring!=='einmalig'?' <span style="background:#efe7d4;color:#8a6d2f;border-radius:4px;padding:1px 5px;font-size:10px">↻ '+esc(e.recurring)+'</span>':''}${e.clientId?' · 👤 '+esc(((this.state.clients||[]).find(c=>c.id===e.clientId)||{}).name||'Kunde'):''}${e.receiptUrl?' · <a href="'+esc(e.receiptUrl)+'" target="_blank" rel="noopener" style="color:var(--a)">📎 Beleg</a>':''}${e.note?`<div style="font-size:12px;color:#9AA4AC">${esc(e.note)}</div>`:''}</div><button class="btn bg bsm" title="Löschen" onclick="App.delExpense('${e.id}')" style="flex:none">✕</button></div>`).join(""):'<div style="color:#9AA4AC">Noch keine Ausgaben erfasst.</div>');
  }
 },
 async loadFinance(){
@@ -2536,14 +2592,36 @@ async addExpense(){
  if(!key){this.toast("Leitstand-Schlüssel fehlt (Einstellungen)");return;}
  const g=id=>document.getElementById(id)?.value.trim()||"";
  const amount=g("ex-amount");if(!amount){this.toast("Betrag eingeben");return;}
- const body={date:g("ex-date"),amount,category:g("ex-cat"),vendor:g("ex-vendor"),note:g("ex-note")};
- const msg=document.getElementById("ex-msg");if(msg)msg.textContent="Speichere …";
+ const msg=document.getElementById("ex-msg");
+ let receiptUrl="";
+ try{
+  const fi=document.getElementById("ex-receipt");
+  if(fi&&fi.files&&fi.files[0]){if(msg)msg.textContent="Lade Beleg hoch …";receiptUrl=await this.uploadReceipt(fi.files[0]);}
+ }catch(e){if(msg)msg.textContent="Beleg-Upload fehlgeschlagen: "+e.message;this.toast("Beleg-Upload fehlgeschlagen");return;}
+ const body={date:g("ex-date"),amount,category:g("ex-cat"),vendor:g("ex-vendor"),note:g("ex-note"),recurring:g("ex-rec")||"einmalig",clientId:g("ex-client")||"",receiptUrl};
+ if(msg)msg.textContent="Speichere …";
  try{
   const r=await fetch(this.apiBase()+"/api/client/expense",{method:"POST",headers:{"Content-Type":"application/json","x-ww-key":key},body:JSON.stringify(body)});
   const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
   ["ex-amount","ex-vendor","ex-note"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  const rf=document.getElementById("ex-receipt");if(rf)rf.value="";
   this._renderFinance(d);if(msg)msg.textContent="✓ Erfasst.";this.toast("Ausgabe erfasst ✓");
  }catch(e){if(msg)msg.textContent="Fehler: "+e.message;this.toast("Speichern fehlgeschlagen");}
+},
+async uploadReceipt(file){
+ const key=localStorage.getItem("ww_api_key")||"";
+ const r=await fetch(this.apiBase()+"/api/client/expense-receipt",{method:"POST",headers:{"x-ww-key":key,"x-filename":file.name||"beleg","Content-Type":file.type||"application/octet-stream"},body:file});
+ const d=await r.json();if(!d.ok)throw new Error(d.error||"Upload-Fehler");return d.url;
+},
+async saveFinanceSettings(){
+ const key=localStorage.getItem("ww_api_key")||"";if(!key){this.toast("Schlüssel fehlt");return;}
+ const tp=document.getElementById("fin-taxpct"),up=document.getElementById("fin-ustpct");
+ const body={};if(tp)body.reserveTaxPct=+tp.value;if(up)body.reserveUstPct=+up.value;
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/finance-settings",{method:"POST",headers:{"Content-Type":"application/json","x-ww-key":key},body:JSON.stringify(body)});
+  const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  this._renderFinance(d);this.toast("Rücklagen aktualisiert ✓");
+ }catch(e){this.toast("Fehler: "+e.message);}
 },
 async delExpense(id){
  const key=localStorage.getItem("ww_api_key")||"";if(!key)return;
@@ -2559,8 +2637,9 @@ exportFinanceCSV(){
  if(!d||!((d.expenses||[]).length||(d.euer||[]).length)){this.toast("Keine Finanzdaten zum Export");return;}
  const q=v=>{v=String(v==null?"":v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
  const dec=n=>(+n||0).toFixed(2).replace(".",",");
- const rows=[["Datum","Betrag (EUR)","Kategorie","Anbieter","Notiz"]];
- (d.expenses||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(e=>rows.push([e.date||"",dec(e.amount),e.category||"",e.vendor||"",e.note||""]));
+ const clName=id=>id?(((this.state.clients||[]).find(c=>c.id===id)||{}).name||""):"";
+ const rows=[["Datum","Betrag (EUR)","Kategorie","Wiederkehr","Kunde","Anbieter","Beleg-URL","Notiz"]];
+ (d.expenses||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(e=>rows.push([e.date||"",dec(e.amount),e.category||"",e.recurring||"einmalig",clName(e.clientId),e.vendor||"",e.receiptUrl||"",e.note||""]));
  rows.push([]);rows.push(["EUER-Uebersicht (vereinfacht, Ist-Prinzip)"]);
  rows.push(["Jahr","Einnahmen (EUR)","Ausgaben (EUR)","Gewinn (EUR)"]);
  (d.euer||[]).forEach(r=>rows.push([r.year,dec(r.income),dec(r.expense),dec(r.profit)]));
