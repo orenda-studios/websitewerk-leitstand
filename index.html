@@ -437,7 +437,17 @@ async apiSave(){
   for(let attempt=0;attempt<2;attempt++){
     try{
       const r=await fetch(this.apiBase()+"/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
-      if(r.ok){this.sync="cloud";this.syncErr="";this.updSync();return;}
+      if(r.ok){
+        // Versionsschutz (Backend v10.90): neue Version merken; hat das Backend Paralleländerungen
+        // (Portal/Factory/Cron) mit unseren zusammengeführt, den vereinten Stand übernehmen.
+        let d=null;try{d=await r.json();}catch(e){}
+        if(d&&d.rev)this.state.__rev=d.rev;
+        if(d&&d.merged&&d.state&&(d.state.leads||d.state.clients)){
+          this.state=d.state;try{localStorage.setItem("ww:state",JSON.stringify(this.state))}catch(e){}
+          this.renderAll();
+          if(d.conflicts)this.toast("Parallel geändert — zusammengeführt ("+d.conflicts+" Überschneidung"+(d.conflicts>1?"en":"")+", deine Eingabe gilt)");
+        }
+        this.sync="cloud";this.syncErr="";this.updSync();return;}
       let t="";try{t=await r.text();}catch(e){}
       console.error("[Sync] Speichern fehlgeschlagen:",r.status,t);
       if(r.status===401){this.syncErr="Kein/falscher Leitstand-Schlüssel (401) — in Einstellungen setzen";break;}
@@ -2906,7 +2916,7 @@ async testBackend(){
  }catch(err){this.toast("❌ Backend nicht erreichbar: "+err.message.slice(0,80));}
 },
 expState(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(this.state,null,2)],{type:"application/json"}));a.download="ww-backup-"+today()+".json";a.click();},
-impState(file){if(!file)return;const r=new FileReader();r.onload=()=>{try{this.state=JSON.parse(r.result);this.persist();this.renderAll();this.toast("Backup importiert ✓")}catch(e){this.toast("Ungültige Datei")}};r.readAsText(file);}
+impState(file){if(!file)return;const r=new FileReader();r.onload=()=>{try{this.state=JSON.parse(r.result);delete this.state.__rev;/* Import = bewusstes Überschreiben, kein Zusammenführen */this.persist();this.renderAll();this.toast("Backup importiert ✓")}catch(e){this.toast("Ungültige Datei")}};r.readAsText(file);}
 };
 App.init();
 </script>
