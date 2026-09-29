@@ -773,7 +773,93 @@ rWachstum(){
   <div class="wx-card" style="margin-top:16px"><div class="wx-title">🧪 A/B-Auswertung</div>${abBlocks}</div>`;
 },
 
+async loadProposals(){
+ const box=document.getElementById("prop-box");if(!box)return;
+ const key=localStorage.getItem("ww_api_key")||"";if(!key){box.innerHTML="";return;}
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/proposals",{headers:{"x-ww-key":key}});
+  const d=await r.json();if(!d.ok)return;
+  const done=(this.state.settings&&this.state.settings.proposals)||{};
+  this._props=(d.proposals||[]).filter(p=>!done[p.id]);
+  box.innerHTML=this._props.map(p=>`<div class="panel" style="border:1px solid var(--a);margin-bottom:12px"><div class="cfg-sec" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+   <div style="flex:1;min-width:240px"><div class="stit" style="color:var(--a);font-size:11px">✨ VORSCHLAG VON CLAUDE · ${esc(p.created||"")}</div><div style="font-weight:700;margin:2px 0 4px">${esc(p.title)}</div><div class="hint">${esc(p.summary||"")}</div><div class="hint" style="margin-top:4px">${p.ops.length} Änderungen — erst nach deinem Klick wirksam.</div></div>
+   <div style="display:flex;gap:8px"><button class="btn ba" onclick="App.showProposal('${esc(p.id)}')">Prüfen &amp; übernehmen</button><button class="btn bg" onclick="App.decideProposal('${esc(p.id)}','verworfen')">Verwerfen</button></div></div></div>`).join("");
+ }catch(e){}
+},
+showProposal(pid){
+ const p=(this._props||[]).find(x=>x.id===pid);if(!p)return;
+ const icon={deleteLead:"🗑",resetLead:"↩",clearNextForStage:"🧹",updateClient:"✎",updateLead:"✎",addLeadOffer:"📄",setLeadKit:"🎯",addLead:"➕"};
+ const old=document.getElementById("prop-ov");if(old)old.remove();
+ const ov=document.createElement("div");ov.id="prop-ov";
+ ov.style.cssText="position:fixed;inset:0;background:rgba(10,14,18,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 16px";
+ ov.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:720px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div class="stit" style="color:var(--a);font-size:11px">VORSCHLAG PRÜFEN</div><h3 style="margin:4px 0 6px">${esc(p.title)}</h3><p class="hint" style="margin-bottom:12px">${esc(p.summary||"")}</p>
+  <ol style="padding-left:20px;font-size:13px;line-height:1.55;margin:0 0 16px">${p.ops.map(o=>{
+    let extra="";
+    if(o.op==="addLeadOffer")extra=`<div style="color:var(--muted);font-size:12px">${(o.offer.items||[]).map(i=>esc(i.name)+" — "+esc(i.preis||"")).join(" · ")}</div>`;
+    if(o.op==="setLeadKit")extra=`<div style="color:var(--muted);font-size:12px">${esc(o.kit.kanal||"")}</div>`;
+    return `<li style="margin:4px 0">${icon[o.op]||"•"} ${esc(o.label||o.op)}${extra}</li>`;}).join("")}</ol>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn bg" onclick="document.getElementById('prop-ov').remove()">Abbrechen</button><button class="btn ba" onclick="App.applyProposal('${esc(p.id)}')">✓ Alles übernehmen</button></div></div>`;
+ ov.addEventListener("click",e=>{if(e.target===ov)ov.remove();});
+ document.body.appendChild(ov);
+},
+applyProposal(pid){
+ const p=(this._props||[]).find(x=>x.id===pid);if(!p)return;
+ const s=this.state,now=Date.now(),log=[];
+ const L=id=>s.leads.find(l=>l.id===id),C=id=>s.clients.find(c=>c.id===id);
+ const tok=()=>{const a=new Uint8Array(9);crypto.getRandomValues(a);return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");};
+ const offerUrl={};
+ // Angebote zuerst — die Verkaufspakete verweisen per {OFFER_URL} darauf
+ const ordered=[...p.ops.filter(o=>o.op!=="setLeadKit"),...p.ops.filter(o=>o.op==="setLeadKit")];
+ for(const o of ordered){
+  try{
+   if(o.op==="deleteLead"){const b=s.leads.length;s.leads=s.leads.filter(l=>l.id!==o.id);if(s.leads.length<b)log.push(o.label);}
+   else if(o.op==="resetLead"){const l=L(o.id);if(!l)continue;if(l.demoUrl)l.altDemoUrl=l.demoUrl;l.demoUrl="";l.stage="discovered";l.demoQuality="unbrauchbar (Entwicklungsphase)";delete l.next;l.notes=l.notes||[];l.notes.unshift({id:uid(),ts:now,text:"Aufgeräumt ("+(p.created||"")+"): Demo aus der Entwicklungsphase, nicht verkaufsfähig. Zurück in den Pool."});log.push(o.label);}
+   else if(o.op==="clearNextForStage"){let n=0;s.leads.forEach(l=>{if(l.stage===o.stage&&l.next){delete l.next;n++;}});log.push(o.label+" ("+n+")");}
+   else if(o.op==="updateLead"){const l=L(o.id);if(l){Object.assign(l,o.set);log.push(o.label);}}
+   else if(o.op==="updateClient"){const c=C(o.id);if(c){Object.assign(c,o.set);log.push(o.label);}}
+   else if(o.op==="addLead"){if(!L(o.lead.id)){s.leads.unshift(Object.assign({createdAt:now},o.lead));log.push(o.label);}}
+   else if(o.op==="addLeadOffer"){const l=L(o.leadId);if(!l)continue;const t=tok();
+     const of=Object.assign({},o.offer,{id:uid(),token:t,status:"offen",createdAt:now});l.offers=l.offers||[];l.offers.unshift(of);l.angebotswert=+of.total||0;
+     offerUrl[o.leadId]=this.apiBase()+"/api/offer/"+t;log.push(o.label);}
+   else if(o.op==="setLeadKit"){const l=L(o.leadId)||C(o.leadId);if(!l)continue;const k=JSON.parse(JSON.stringify(o.kit));
+     const u=offerUrl[o.leadId]||((l.offers&&l.offers[0])?this.apiBase()+"/api/offer/"+l.offers[0].token:"");
+     if(k.whatsapp)k.whatsapp=k.whatsapp.split("{OFFER_URL}").join(u||"(Angebot folgt)");l.salesKit=Object.assign({},l.salesKit||{},k,{updatedAt:now});log.push(o.label);}
+  }catch(e){console.error("[Vorschlag]",o,e);}
+ }
+ s.settings=s.settings||{};s.settings.proposals=s.settings.proposals||{};s.settings.proposals[pid]={status:"übernommen",at:now,changes:log.length};
+ s.events.unshift({id:uid(),ts:now,pipeline:"acq",from:"—",to:"vorschlag",actor:"Du",entity:"CRM",note:"Vorschlag übernommen: "+p.title+" ("+log.length+" Änderungen)"});
+ const ov=document.getElementById("prop-ov");if(ov)ov.remove();
+ this.persist();this.renderAll();this.toast("✓ Übernommen: "+log.length+" Änderungen");
+},
+decideProposal(pid,status){
+ if(status==="verworfen"&&!confirm("Vorschlag verwerfen?"))return;
+ const s=this.state;s.settings=s.settings||{};s.settings.proposals=s.settings.proposals||{};s.settings.proposals[pid]={status,at:Date.now()};
+ this.persist();this.renderAll();
+},
+kitHtml(item){
+ const k=item.salesKit,offers=item.offers||[];
+ if(!k&&!offers.length)return "";
+ const li=a=>(a||[]).map(x=>`<li style="margin:2px 0">${esc(x)}</li>`).join("");
+ const ofs=offers.map(o=>{const url=this.apiBase()+"/api/offer/"+o.token;
+  const st=o.status==="angenommen"?`<span style="color:var(--g);font-weight:700">✓ angenommen ${o.acceptedAt?new Date(o.acceptedAt).toLocaleDateString("de-DE"):""}</span>`:o.viewedAt?`<span style="color:var(--amb);font-weight:700">👀 geöffnet ${new Date(o.viewedAt).toLocaleDateString("de-DE")}</span>`:`<span style="color:var(--muted)">noch nicht geöffnet</span>`;
+  return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:6px 0;font-size:12px;background:#fff"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(o.title)}</b><span style="white-space:nowrap">${fmt(o.total)} €${o.careMonthly?" + "+fmt(o.careMonthly)+" €/M":""}</span></div><div style="margin-top:3px">${st} · <a href="${esc(url)}?preview=1" target="_blank" rel="noopener" style="color:var(--a)">ansehen</a> · <a href="#" onclick="event.preventDefault();App.copyText('${esc(url)}','Angebotslink kopiert')" style="color:var(--a)">Link kopieren</a></div></div>`;}).join("");
+ this._kitMsg=k&&k.whatsapp||"";
+ return `<div style="background:#FFF8F3;border:1px solid #F6D5C2;border-radius:10px;padding:12px 14px;margin:4px 0 14px">
+  <div class="stit" style="color:var(--a);font-size:11px;margin-bottom:6px">🎯 VERKAUFSPAKET</div>
+  ${k?`${k.kanal?`<div style="font-size:12px;margin-bottom:4px"><b>Weg:</b> ${esc(k.kanal)}</div>`:""}${k.ansprechpartner?`<div style="font-size:12px;margin-bottom:4px"><b>Ansprechpartner:</b> ${esc(k.ansprechpartner)}</div>`:""}
+  ${k.warum?`<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(k.warum)}</div>`:""}
+  ${k.einstieg?`<div style="font-size:12px;margin-bottom:6px"><b>Einstieg:</b> „${esc(k.einstieg)}"</div>`:""}
+  ${k.leitfaden?`<details open><summary style="font-size:12px;font-weight:700;cursor:pointer">Gesprächsleitfaden</summary><ol style="font-size:12px;padding-left:18px;margin:4px 0 8px">${li(k.leitfaden)}</ol></details>`:""}
+  ${k.einwaende?`<details><summary style="font-size:12px;font-weight:700;cursor:pointer">Einwände (${k.einwaende.length})</summary>${k.einwaende.map(x=>`<div style="font-size:12px;margin:5px 0"><b>„${esc(x.e)}"</b><br><span style="color:var(--muted)">→ ${esc(x.a)}</span></div>`).join("")}</details>`:""}
+  ${k.whatsapp?`<details><summary style="font-size:12px;font-weight:700;cursor:pointer">Nachricht (WhatsApp/Mail)</summary><pre style="white-space:pre-wrap;font:12px/1.5 system-ui;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px;margin:6px 0">${esc(k.whatsapp)}</pre><button class="btn bg" style="font-size:12px" onclick="App.copyText(App._kitMsg,'Nachricht kopiert')">📋 Nachricht kopieren</button></details>`:""}
+  ${k.vorLive?`<details><summary style="font-size:12px;font-weight:700;cursor:pointer">Brauchen wir vom Kunden (${k.vorLive.length})</summary><ul style="font-size:12px;padding-left:18px;margin:4px 0">${li(k.vorLive)}</ul></details>`:""}`:""}
+  ${offers.length?`<div style="margin-top:8px"><div style="font-size:11px;font-weight:700;color:var(--muted)">ANGEBOT${offers.length>1?"E":""}</div>${ofs}</div>`:""}
+ </div>`;
+},
+copyText(t,msg){try{navigator.clipboard.writeText(t).then(()=>this.toast(msg||"Kopiert"),()=>{prompt("Kopieren:",t);});}catch(e){prompt("Kopieren:",t);}},
 rHeute(){
+ setTimeout(()=>this.loadProposals(),0);
  const s=this.state;
  const foc=[
   ...[...s.leads.map(x=>({it:x,g:"akquise"})),...s.clients.map(x=>({it:x,g:"kunden"}))].flatMap(({it,g})=>(it.tasks||[]).filter(t=>!t.done&&(t.prio==="hoch"||/^🔴/.test(t.text||""))).map(t=>({p:95,t:`${t.text} – ${it.name}`,c:"Dringende Aufgabe",g}))),
@@ -784,14 +870,14 @@ rHeute(){
   ...s.clients.filter(c=>isOD(c.next?.due)&&c.phase!=="at_risk").map(c=>({p:60,t:`${c.next.label} – ${c.name}`,c:"Kunden · fällig",g:"kunden"})),
   ...s.leads.filter(l=>l.stage==="review_needed").map(l=>({p:50,t:`Human Check: ${l.name}`,c:"Builds · Review",g:"akquise"}))
  ].sort((a,b)=>b.p-a.p).slice(0,5);
- const orph=[...s.leads,...s.clients].filter(x=>!x.next?.label);
+ const orph=[...s.leads.filter(l=>!["discovered","disqualified","lost","nurture"].includes(l.stage)),...s.clients.filter(c=>!["former","offboarding"].includes(c.phase))].filter(x=>!x.next?.label); // Such-Pool ist nicht verwaist
  const hot=s.leads.filter(l=>["engaged","in_conversation","offer_sent","negotiation"].includes(l.stage));
  const attn=s.clients.filter(c=>["at_risk","renewal","client_review"].includes(c.phase));
  const pipeWert=s.leads.filter(l=>["sales_ready","letter_sent","engaged","in_conversation","offer_sent","negotiation"].includes(l.stage)).length;
  const openTasks=[];
  [...s.leads.map(l=>({it:l,pl:"acq"})),...s.clients.map(c=>({it:c,pl:"cli"}))].forEach(({it,pl})=>{(it.tasks||[]).forEach(t=>{if(!t.done&&t.due&&t.due<=today())openTasks.push({taskId:t.id,text:t.text,due:t.due,name:it.name,pl,itemId:it.id});});});
  openTasks.sort((a,b)=>(a.due<b.due?-1:1));
- document.getElementById("v-heute").innerHTML=`
+ document.getElementById("v-heute").innerHTML=`<div id="prop-box"></div>
   <div class="panel"><div class="ph">⚡ Fokus heute · max. 5 · Wert × Dringlichkeit</div>
    ${foc.length?foc.map((f,i)=>`<button class="fi" onclick="App.show('${f.g}')"><span class="fn">${i+1}</span><span style="color:${f.p>=90?"var(--red)":"var(--a)"}">●</span><span class="ft">${esc(f.t)}</span><span class="fc">${f.c}</span><span style="color:#C5CCD1">›</span></button>`).join("")
    :`<div class="empty">Alles abgearbeitet – neuen Lead-Finder-Lauf starten.</div>`}
@@ -1594,6 +1680,7 @@ renderDrawer(){
    <button class="xb" onclick="App.closeDetail()">×</button>
   </div>
   <div class="drb">
+   ${App.kitHtml(item)}
    ${pl==="cli"?(()=>{const cs=App.careScore(item);const g=item.wpHealth&&item.wpHealth.grade;const gc={A:"var(--g)",B:"#5b9e2f",C:"var(--amb)",D:"#e8704a",F:"var(--red)"}[g]||"#9AA4AC";const fbs=(item.changeRequests||[]).filter(r=>r.feedback);const sat=fbs.length?Math.round(fbs.filter(r=>r.feedback.rating==="up").length/fbs.length*100)+"%":"–";const tile=(v,l,c)=>`<div style="flex:1;text-align:center;padding:9px 4px"><div style="font-size:18px;font-weight:800;color:${c||"#1a1a18"}">${v}</div><div style="font-size:9px;color:#9AA4AC;text-transform:uppercase;letter-spacing:.04em;margin-top:1px">${l}</div></div>`;const sep='<div style="width:1px;background:#ece9e6"></div>';return `<div style="display:flex;flex:none;background:#faf9f8;border:1px solid #ece9e6;border-radius:12px;margin-bottom:12px;overflow:hidden">${tile(cs.score,"Care-Score",cs.color)}${sep}${tile(g||"–","Website",gc)}${sep}${tile(sat,"Zufrieden","#1a1a18")}${sep}${tile(fmt(item.mrr)+"€","MRR","#1a1a18")}</div>`;})():""}
    ${pl==="cli"?(()=>{const steps=[["Portal-E-Mail hinterlegt",!!item.email],["Einladung gesendet",!!item.portalInvitedAt],["Kunde eingeloggt",!!item.portalToken],["Website live",!!(item.liveUrl||item.demoUrl)],["Erste Rechnung gestellt",!!((item.invoices||[]).length)],["Care-Paket aktiv",["care_active","growth","renewal"].includes(item.phase)||+item.mrr>0]];const done=steps.filter(s=>s[1]).length;if(done===steps.length)return "";return `<div class="infobox" style="margin-top:8px;margin-bottom:2px"><b style="font-size:11px">🚀 Onboarding · ${done}/${steps.length}</b><div style="height:5px;background:#eee;border-radius:3px;margin:6px 0;overflow:hidden"><div style="height:100%;width:${Math.round(done/steps.length*100)}%;background:var(--g)"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 12px">${steps.map(s=>`<div style="font-size:11px;color:${s[1]?"var(--muted)":"#1a1a18"};font-weight:${s[1]?"400":"600"}">${s[1]?"✅":"⬜"} ${s[0]}</div>`).join("")}</div></div>`;})():""}
    <!-- ── Basis-Infos ───────────────────────────────────── -->
@@ -1605,7 +1692,7 @@ renderDrawer(){
     ${item.phone?`<div><div class="kl">Telefon</div><a href="tel:${esc(item.phone)}" style="font-family:ui-monospace,monospace;font-size:12px">${esc(item.phone)}</a></div>`:""}
     ${item.referredByName?`<div style="grid-column:1/-1"><span style="display:inline-block;background:rgba(31,157,85,.12);color:#1f7a3f;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px">🎁 Empfohlen von ${esc(item.referredByName)}</span></div>`:""}
    </div>
-   ${(item.demoUrl||item.liveUrl)?`<a href="${esc(item.liveUrl||item.demoUrl)}" target="_blank" rel="noopener" title="Vorschau öffnen"><img src="https://image.thum.io/get/width/500/crop/300/noanimate/${esc(item.liveUrl||item.demoUrl)}" alt="Vorschau ${esc(item.name||"")}" style="width:100%;max-height:120px;object-fit:cover;object-position:top;border-radius:8px;border:1px solid var(--bd);display:block;margin:4px 0 8px" loading="lazy" onerror="this.style.display='none'"></a>`:""}
+   ${(item.demoUrl||item.liveUrl)?`<a href="${esc(item.liveUrl||item.demoUrl)}" target="_blank" rel="noopener" title="Vorschau öffnen" style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:4px 0 10px;text-decoration:none;color:var(--ink);background:linear-gradient(135deg,#fff,#F7F4EF)"><span style="font-size:20px">🖥</span><span style="flex:1;min-width:0"><b style="font-size:13px">${item.liveUrl?"Live-Website":"Demo"} öffnen</b><br><span style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc((item.liveUrl||item.demoUrl).replace(/^https?:\/\//,""))}</span></span><span style="color:var(--a);font-weight:700">↗</span></a>`:""}
    ${(item.demoUrl||item.liveUrl)?`<div style="margin:4px 0 10px">${item.website?`<a href="${App.apiBase()}/api/compare/${id}" target="_blank" rel="noopener" style="display:inline-block;font-size:12px;color:var(--a);font-weight:700">📊 Website-Vergleich (alt vs. neu) ↗</a> · `:""}<a href="#" onclick="event.preventDefault();App.copyPitch('${id}')" style="font-size:12px;color:var(--a);font-weight:700">📋 Pitch-Text kopieren</a><div style="font-size:10px;color:var(--muted)">${item.website?"Messbarer Qualitäts-Sprung — Vergleich + fertiger Mail-Entwurf zum Selbst-Senden.":"Fertiger Mail-Entwurf mit Ihrer Demo-Vorschau zum Selbst-Senden."}</div></div>`:""}
    ${item.website?`<div style="margin:0 0 10px"><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Detail-Analysen der aktuellen Seite (druckbar/sendbar):</div><a href="${App.apiBase()}/api/seo-report/${id}" target="_blank" rel="noopener" style="font-size:12px;color:var(--a);font-weight:700">🔎 SEO ↗</a> · <a href="${App.apiBase()}/api/a11y-report/${id}" target="_blank" rel="noopener" style="font-size:12px;color:var(--a);font-weight:700">♿ Barrierefreiheit ↗</a> · <a href="${App.apiBase()}/api/security-report/${id}" target="_blank" rel="noopener" style="font-size:12px;color:var(--a);font-weight:700">🛡️ Sicherheit ↗</a> · <a href="${App.apiBase()}/api/linkcheck-report/${id}" target="_blank" rel="noopener" style="font-size:12px;color:var(--a);font-weight:700">🔗 Links ↗</a></div>`:""}
    ${(pl==="acq"&&item.phone)?`<div style="margin:0 0 10px"><a href="#" onclick="event.preventDefault();App.copyCallScript('${id}')" style="font-size:12px;color:var(--a);font-weight:700">📞 Call-Script kopieren</a>${(item.demoUrl||item.liveUrl)?` · <a href="#" onclick="event.preventDefault();App.waSend('${id}')" style="font-size:12px;color:#25a366;font-weight:700">📲 Vorschau per WhatsApp</a>`:""}<div style="font-size:10px;color:var(--muted)">Telefon-Leitfaden für den Anruf (Cold Calling)${(item.demoUrl||item.liveUrl)?" · WhatsApp-Nachricht mit Demo-Link, vorbereitet zum Selbst-Senden":""}.</div></div>`:""}
