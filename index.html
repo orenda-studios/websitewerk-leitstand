@@ -788,7 +788,7 @@ async loadProposals(){
 },
 showProposal(pid){
  const p=(this._props||[]).find(x=>x.id===pid);if(!p)return;
- const icon={deleteLead:"🗑",resetLead:"↩",clearNextForStage:"🧹",updateClient:"✎",updateLead:"✎",addLeadOffer:"📄",setLeadKit:"🎯",addLead:"➕"};
+ const icon={startFactory:"🏭",deleteLead:"🗑",resetLead:"↩",clearNextForStage:"🧹",updateClient:"✎",updateLead:"✎",addLeadOffer:"📄",setLeadKit:"🎯",addLead:"➕"};
  const old=document.getElementById("prop-ov");if(old)old.remove();
  const ov=document.createElement("div");ov.id="prop-ov";
  ov.style.cssText="position:fixed;inset:0;background:rgba(10,14,18,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 16px";
@@ -803,8 +803,9 @@ showProposal(pid){
  ov.addEventListener("click",e=>{if(e.target===ov)ov.remove();});
  document.body.appendChild(ov);
 },
-applyProposal(pid){
+async applyProposal(pid){
  const p=(this._props||[]).find(x=>x.id===pid);if(!p)return;
+ const factoryIds=[];
  const s=this.state,now=Date.now(),log=[];
  const L=id=>s.leads.find(l=>l.id===id),C=id=>s.clients.find(c=>c.id===id);
  const tok=()=>{const a=new Uint8Array(9);crypto.getRandomValues(a);return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");};
@@ -818,6 +819,7 @@ applyProposal(pid){
    else if(o.op==="clearNextForStage"){let n=0;s.leads.forEach(l=>{if(l.stage===o.stage&&l.next){delete l.next;n++;}});log.push(o.label+" ("+n+")");}
    else if(o.op==="updateLead"){const l=L(o.id);if(l){Object.assign(l,o.set);log.push(o.label);}}
    else if(o.op==="updateClient"){const c=C(o.id);if(c){Object.assign(c,o.set);log.push(o.label);}}
+   else if(o.op==="startFactory"){if(L(o.leadId))factoryIds.push(o.leadId);}
    else if(o.op==="addLead"){if(!L(o.lead.id)){s.leads.unshift(Object.assign({createdAt:now},o.lead));log.push(o.label);}}
    else if(o.op==="addLeadOffer"){const l=L(o.leadId);if(!l)continue;const t=tok();
      const of=Object.assign({},o.offer,{id:uid(),token:t,status:"offen",createdAt:now});l.offers=l.offers||[];l.offers.unshift(of);l.angebotswert=+of.total||0;
@@ -831,6 +833,16 @@ applyProposal(pid){
  s.events.unshift({id:uid(),ts:now,pipeline:"acq",from:"—",to:"vorschlag",actor:"Du",entity:"CRM",note:"Vorschlag übernommen: "+p.title+" ("+log.length+" Änderungen)"});
  const ov=document.getElementById("prop-ov");if(ov)ov.remove();
  this.persist();this.renderAll();this.toast("✓ Übernommen: "+log.length+" Änderungen");
+ if(factoryIds.length){
+  // erst speichern (die Factory liest den Lead aus der Datenbank), dann starten
+  clearTimeout(this.saveT);await this.apiSave();
+  const key=localStorage.getItem("ww_api_key")||"";
+  for(const id of factoryIds){
+   try{const r=await fetch(this.apiBase()+"/api/factory/run",{method:"POST",headers:{"Content-Type":"application/json","x-ww-key":key},body:JSON.stringify({leadId:id})});
+    const d=await r.json();this.toast(d.status==="started"?"🏭 Factory gestartet — Fortschritt im Lead":"Factory-Start fehlgeschlagen: "+(d.error||r.status));}
+   catch(e){this.toast("Factory-Start fehlgeschlagen");}
+  }
+ }
 },
 decideProposal(pid,status){
  if(status==="verworfen"&&!confirm("Vorschlag verwerfen?"))return;
