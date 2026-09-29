@@ -329,6 +329,7 @@ nav a.active{box-shadow:0 4px 12px rgba(26,37,48,.28)}
     <div class="view" id="v-protokoll"></div>
     <div class="view pad" id="v-wachstum"></div>
     <div class="view pad" id="v-finanzen"></div>
+    <div class="view pad" id="v-system"></div>
     <div class="view pad" id="v-einstellungen"></div>
   </main>
 </div>
@@ -515,7 +516,7 @@ async reconnectTick(){
 async resetAll(){if(!confirm("Demo-Daten wiederherstellen?"))return;this.state=seed();this.persist();this.renderAll();this.toast("Zurückgesetzt");},
 
 renderNav(){
- const items=[["heute","⌂","Heute"],["akquise","⚙","Akquise"],["kunden","◉","Kunden"],["projekte","▦","Anfragen"],["wachstum","↗","Wachstum"],["finanzen","€","Finanzen"],["finder","◎","Lead-Finder"],["protokoll","≡","Protokoll"],["einstellungen","✦","Einstellungen"]];
+ const items=[["heute","⌂","Heute"],["akquise","⚙","Akquise"],["kunden","◉","Kunden"],["projekte","▦","Anfragen"],["wachstum","↗","Wachstum"],["finanzen","€","Finanzen"],["system","🛡","System"],["finder","◎","Lead-Finder"],["protokoll","≡","Protokoll"],["einstellungen","✦","Einstellungen"]];
  document.getElementById("nav").innerHTML=items.map(([id,ic,l])=>`<a id="n-${id}" onclick="App.show('${id}')"><span class="ic">${ic}</span>${l}${id==="projekte"?`<span id="nav-badge-anfragen" style="display:none;margin-left:auto;background:var(--a);color:#fff;font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px;min-width:18px;text-align:center">0</span>`:""}</a>`).join("");
  this.updateInboxBadge();
 },
@@ -526,7 +527,7 @@ show(v){
  document.getElementById("v-"+v).classList.add("active");
  document.querySelectorAll("nav a").forEach(a=>a.classList.remove("active"));
  document.getElementById("n-"+v).classList.add("active");
- document.getElementById("vt").textContent={heute:"Heute",akquise:"Akquise",kunden:"Kunden",projekte:"Anfragen",wachstum:"Wachstum",finanzen:"Finanzen",finder:"Lead-Finder",protokoll:"Protokoll",einstellungen:"Einstellungen"}[v];
+ document.getElementById("vt").textContent={heute:"Heute",akquise:"Akquise",kunden:"Kunden",projekte:"Anfragen",wachstum:"Wachstum",finanzen:"Finanzen",system:"System",finder:"Lead-Finder",protokoll:"Protokoll",einstellungen:"Einstellungen"}[v];
  this.renderAll();
 },
 kpis(){const s=this.state,mrr=s.clients.filter(c=>!["former","offboarding"].includes(c.phase)).reduce((a,c)=>a+(+c.mrr||0),0),off=s.leads.filter(l=>["offer_sent","negotiation"].includes(l.stage)).reduce((a,l)=>a+(+l.angebotswert||0),0);const anfrDone=["freigeschaltet","erledigt","abgelehnt","beantwortet"];const anfr=s.clients.reduce((a,c)=>a+(c.careRequests||[]).filter(q=>!anfrDone.includes(q.status)).length+(c.assistantHandoffs||[]).filter(h=>!anfrDone.includes(h.status)).length,0);let fbUp=0,fbDown=0;s.clients.forEach(c=>(c.changeRequests||[]).forEach(r=>{if(r.feedback){if(r.feedback.rating==="up")fbUp++;else fbDown++;}}));return{mrr,off,sr:s.leads.filter(l=>l.stage==="sales_ready").length,ar:s.clients.filter(c=>c.phase==="at_risk").length,anfr,fbUp,fbDown};},
@@ -543,6 +544,7 @@ renderAll(){
  else if(this.view==="finder")this.rFinder();
  else if(this.view==="wachstum")this.rWachstum();
  else if(this.view==="finanzen")this.rFinanzen();
+ else if(this.view==="system")this.rSystem();
  else if(this.view==="protokoll")this.rLog();
  else if(this.view==="einstellungen")this.rSettings();
 },
@@ -2423,6 +2425,58 @@ async sysCheck(){
  }catch(e){if(box)box.innerHTML='<span style="color:var(--red)">Verbindung fehlgeschlagen</span>';}
 },
 /* === Finanzen / Firma (eigene Rechnungs-Identität + Umsatz) === */
+rSystem(){
+ document.getElementById("v-system").innerHTML=`<div style="max-width:760px;display:flex;flex-direction:column;gap:0">
+  <div class="panel"><div class="cfg-sec">
+   <div class="stit" style="color:var(--a);font-size:11px">🛡 SYSTEM-GESUNDHEIT</div>
+   <p class="hint" style="margin-bottom:10px">Der Wächter prüft alle 10 Min. Portal, Leitstand, n8n, Website und Datenbank — Alarm per Mail an lukas@. Zertifikate und Domains alle 6 Std.</p>
+   <div id="sys-body" style="font-size:13px;color:var(--muted)">Lade …</div>
+   <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn bg" onclick="App.loadSystem()">↻ Neu laden</button><button class="btn ba" id="sys-bk" onclick="App.backupNow()">💾 Backup jetzt</button></div>
+   <div id="sys-msg" class="hint" style="margin-top:8px"></div>
+  </div></div></div>`;
+ this.loadSystem();
+},
+async loadSystem(){
+ const key=localStorage.getItem("ww_api_key")||"",el=document.getElementById("sys-body");
+ if(!el)return;
+ if(!key){el.innerHTML="⚠ Leitstand-Schlüssel fehlt — in <b>Einstellungen</b> setzen.";return;}
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/system-status",{headers:{"x-ww-key":key}});
+  const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  const esc=x=>String(x==null?"":x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const dot=(ok,warn)=>`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:${ok?"var(--g)":warn?"var(--amb)":"var(--red)"}"></span>`;
+  const row=(a,b,c)=>`<div style="display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--bs)"><div style="flex:1;color:var(--ink)">${a}</div><div style="color:var(--muted);text-align:right">${b}</div>${c?`<div style="width:80px;text-align:right;color:var(--muted)">${c}</div>`:""}</div>`;
+  const w=d.watch,checks=w?w.checks:[];
+  const hb=d.heartbeat||{},hbOk=hb.lastMinutesAgo!=null&&hb.lastMinutesAgo<=12;
+  const bk=d.backup,bks=d.backups||[];
+  const certs=(d.full&&d.full.certs)||[],doms=(d.full&&d.full.domains)||[];
+  const ago=t=>{if(!t)return "—";const m=Math.round((Date.now()-t)/6e4);return m<1?"gerade eben":m<90?"vor "+m+" Min.":"vor "+Math.round(m/60)+" Std."};
+  el.innerHTML=
+   (d.openAlerts&&d.openAlerts.length?`<div class="alert-bar" style="margin-bottom:12px">🔴 ${d.openAlerts.length} offene(r) Alarm(e): ${d.openAlerts.map(a=>esc(a.key)).join(", ")}</div>`:`<div style="margin-bottom:10px;color:var(--g);font-weight:700">✓ Keine offenen Alarme</div>`)+
+   `<div class="stit" style="font-size:11px;margin:10px 0 2px">ERREICHBARKEIT ${w?"· "+ago(w.ts):""}</div>`+
+   (checks.length?checks.map(c=>row(dot(c.ok,c.info)+esc(c.name)+(c.info&&!c.ok?" <span style='font-size:11px'>(noch nicht geschaltet)</span>":""),c.status==null?"keine Antwort":"HTTP "+esc(c.status),c.ms!=null?c.ms+" ms":"")).join(""):"<div>Erster Lauf folgt in wenigen Minuten nach dem Start.</div>")+
+   `<div class="stit" style="font-size:11px;margin:14px 0 2px">ZERTIFIKATE &amp; DOMAINS</div>`+
+   (certs.length?certs.map(c=>row(dot(c.days!=null&&c.days>14,c.days!=null&&c.days>7)+"SSL "+esc(c.host),c.days==null?"nicht prüfbar":"noch "+c.days+" Tage")).join(""):"")+
+   doms.map(x=>row(dot(x.days==null||x.days>60,x.days!=null&&x.days>30)+"Domain "+esc(x.domain),x.days==null?esc(x.note||"—"):"noch "+x.days+" Tage")).join("")+
+   `<div class="stit" style="font-size:11px;margin:14px 0 2px">AUTOMATISIERUNG</div>`+
+   row(dot(hbOk,hb.lastMinutesAgo!=null&&hb.lastMinutesAgo<=20)+"n8n / Hetzner-Herzschlag",hb.lastMinutesAgo==null?"noch keiner seit Neustart":"vor "+hb.lastMinutesAgo+" Min.")+
+   `<div class="stit" style="font-size:11px;margin:14px 0 2px">BACKUPS (täglich, 30 Tage)</div>`+
+   row(dot(bk&&bk.ok!==false,false)+"Letztes Backup",bk?esc(bk.name||""):"—",bk&&bk.leads!=null?bk.leads+" Leads · "+bk.clients+" Kunden":"")+
+   `<div style="margin-top:6px;font-size:12px;color:var(--muted)">${bks.length?bks.length+" Tages-Sicherungen vorhanden, älteste "+esc(bks[bks.length-1].date)+", neueste "+esc(bks[0].date)+". Sonntags zusätzlich als Mail-Anhang an lukas@.":"Noch keine Tages-Sicherung."}</div>`+
+   `<div style="margin-top:8px;font-size:11px;color:var(--muted)">Backend läuft seit ${Math.round(d.uptimeMin/60*10)/10} Std.</div>`;
+ }catch(e){el.textContent="Status nicht ladbar: "+e.message;}
+},
+async backupNow(){
+ const key=localStorage.getItem("ww_api_key")||"";if(!key){this.toast("Schlüssel fehlt");return;}
+ const b=document.getElementById("sys-bk"),m=document.getElementById("sys-msg");
+ if(b)b.disabled=true;if(m)m.textContent="Sichere …";
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/backup-now",{method:"POST",headers:{"x-ww-key":key}});
+  const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  if(m)m.textContent="✓ Backup "+d.name+": "+d.leads+" Leads, "+d.clients+" Kunden, "+Math.round(d.bytes/1024)+" KB.";this.toast("Backup erstellt ✓");this.loadSystem();
+ }catch(e){if(m)m.textContent="Fehler: "+e.message;this.toast("Backup fehlgeschlagen");}
+ if(b)b.disabled=false;
+},
 rFinanzen(){
  const invs=[];(this.state.clients||[]).forEach(c=>(c.invoices||[]).forEach(i=>invs.push(i)));
  const isPaid=i=>["bezahlt","paid","beglichen"].includes(String(i.status||"").toLowerCase());
