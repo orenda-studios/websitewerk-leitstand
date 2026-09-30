@@ -3416,9 +3416,9 @@ function onInput(e){const k=e.target.dataset.k;if(!k)return;let v=e.target.type=
  setK(k,v);OS.dirty=true;
  const T=calc(OS.o);const sm=document.querySelector(".os-sum");if(sm)sm.querySelectorAll("b")[0].textContent=EUR(T.once),sm.querySelectorAll("b")[1].textContent=EUR(T.mon);
  if(e.type==="change"&&e.target.type==="checkbox")render();else{clearTimeout(OS.prevT);OS.prevT=setTimeout(preview,650);}}
-async function preview(){const st=document.getElementById("os-st");if(st)st.textContent="aktualisiere …";
+async function preview(){const seq=OS.seq=(OS.seq||0)+1;const st=document.getElementById("os-st");if(st)st.textContent="aktualisiere …";
  try{const r=await fetch(App.apiBase()+"/api/client/offer-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId:OS.t.id,token:OS.token,offer:payload()})});
-  const h=await r.text();const fr=document.getElementById("os-if");if(fr){const y=fr.contentWindow&&fr.contentWindow.scrollY||0;fr.srcdoc=h;fr.onload=()=>{try{fr.contentWindow.scrollTo(0,y)}catch(e){}};}
+  const h=await r.text();if(seq!==OS.seq)return;const fr=document.getElementById("os-if");if(fr){const y=fr.contentWindow&&fr.contentWindow.scrollY||0;fr.srcdoc=h;fr.onload=()=>{try{fr.contentWindow.scrollTo(0,y)}catch(e){}};}
   if(st)st.textContent=r.ok?"":"Vorschau-Fehler "+r.status;}catch(e){if(st)st.textContent="offline";}}
 window.OStudio={
  open0(pl,id,token){OS.t={pl,id};OS.token=token||null;OS.dirty=false;const s=subj();const off=token?(s.offers||[]).find(x=>x.token===token):null;
