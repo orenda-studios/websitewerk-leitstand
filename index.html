@@ -851,7 +851,7 @@ decideProposal(pid,status){
 },
 kitHtml(item){
  const k=item.salesKit,offers=item.offers||[];
- if(!k&&!offers.length)return "";
+ if(!k)return "";
  const li=a=>(a||[]).map(x=>`<li style="margin:2px 0">${esc(x)}</li>`).join("");
  const ofs=offers.map(o=>{const url=this.apiBase()+"/api/offer/"+o.token;
   const st=o.status==="angenommen"?`<span style="color:var(--g);font-weight:700">✓ angenommen ${o.acceptedAt?new Date(o.acceptedAt).toLocaleDateString("de-DE"):""}</span>`:o.viewedAt?`<span style="color:var(--amb);font-weight:700">👀 geöffnet ${new Date(o.viewedAt).toLocaleDateString("de-DE")}</span>`:`<span style="color:var(--muted)">noch nicht geöffnet</span>`;
@@ -866,7 +866,6 @@ kitHtml(item){
   ${k.einwaende?`<details><summary style="font-size:12px;font-weight:700;cursor:pointer">Einwände (${k.einwaende.length})</summary>${k.einwaende.map(x=>`<div style="font-size:12px;margin:5px 0"><b>„${esc(x.e)}"</b><br><span style="color:var(--muted)">→ ${esc(x.a)}</span></div>`).join("")}</details>`:""}
   ${k.whatsapp?`<details><summary style="font-size:12px;font-weight:700;cursor:pointer">Nachricht (WhatsApp/Mail)</summary><pre style="white-space:pre-wrap;font:12px/1.5 system-ui;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px;margin:6px 0">${esc(k.whatsapp)}</pre><button class="btn bg" style="font-size:12px" onclick="App.copyText(App._kitMsg,'Nachricht kopiert')">📋 Nachricht kopieren</button></details>`:""}
   ${k.vorLive?`<details><summary style="font-size:12px;font-weight:700;cursor:pointer">Brauchen wir vom Kunden (${k.vorLive.length})</summary><ul style="font-size:12px;padding-left:18px;margin:4px 0">${li(k.vorLive)}</ul></details>`:""}`:""}
-  ${offers.length?`<div style="margin-top:8px"><div style="font-size:11px;font-weight:700;color:var(--muted)">ANGEBOT${offers.length>1?"E":""}</div>${ofs}</div>`:""}
  </div>`;
 },
 copyText(t,msg){try{navigator.clipboard.writeText(t).then(()=>this.toast(msg||"Kopiert"),()=>{prompt("Kopieren:",t);});}catch(e){prompt("Kopieren:",t);}},
@@ -1693,6 +1692,7 @@ renderDrawer(){
   </div>
   <div class="drb">
    ${App.kitHtml(item)}
+   ${App.offerPanel?App.offerPanel(item,pl):""}
    ${pl==="cli"?(()=>{const cs=App.careScore(item);const g=item.wpHealth&&item.wpHealth.grade;const gc={A:"var(--g)",B:"#5b9e2f",C:"var(--amb)",D:"#e8704a",F:"var(--red)"}[g]||"#9AA4AC";const fbs=(item.changeRequests||[]).filter(r=>r.feedback);const sat=fbs.length?Math.round(fbs.filter(r=>r.feedback.rating==="up").length/fbs.length*100)+"%":"–";const tile=(v,l,c)=>`<div style="flex:1;text-align:center;padding:9px 4px"><div style="font-size:18px;font-weight:800;color:${c||"#1a1a18"}">${v}</div><div style="font-size:9px;color:#9AA4AC;text-transform:uppercase;letter-spacing:.04em;margin-top:1px">${l}</div></div>`;const sep='<div style="width:1px;background:#ece9e6"></div>';return `<div style="display:flex;flex:none;background:#faf9f8;border:1px solid #ece9e6;border-radius:12px;margin-bottom:12px;overflow:hidden">${tile(cs.score,"Care-Score",cs.color)}${sep}${tile(g||"–","Website",gc)}${sep}${tile(sat,"Zufrieden","#1a1a18")}${sep}${tile(fmt(item.mrr)+"€","MRR","#1a1a18")}</div>`;})():""}
    ${pl==="cli"?(()=>{const steps=[["Portal-E-Mail hinterlegt",!!item.email],["Einladung gesendet",!!item.portalInvitedAt],["Kunde eingeloggt",!!item.portalToken],["Website live",!!(item.liveUrl||item.demoUrl)],["Erste Rechnung gestellt",!!((item.invoices||[]).length)],["Care-Paket aktiv",["care_active","growth","renewal"].includes(item.phase)||+item.mrr>0]];const done=steps.filter(s=>s[1]).length;if(done===steps.length)return "";return `<div class="infobox" style="margin-top:8px;margin-bottom:2px"><b style="font-size:11px">🚀 Onboarding · ${done}/${steps.length}</b><div style="height:5px;background:#eee;border-radius:3px;margin:6px 0;overflow:hidden"><div style="height:100%;width:${Math.round(done/steps.length*100)}%;background:var(--g)"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 12px">${steps.map(s=>`<div style="font-size:11px;color:${s[1]?"var(--muted)":"#1a1a18"};font-weight:${s[1]?"400":"600"}">${s[1]?"✅":"⬜"} ${s[0]}</div>`).join("")}</div></div>`;})():""}
    <!-- ── Basis-Infos ───────────────────────────────────── -->
@@ -1931,7 +1931,6 @@ renderDrawer(){
     ${(item.upsellSignals||[]).length?`<div class="infobox" style="margin-top:6px;border-left:3px solid var(--a)"><b style="font-size:11px">📈 Upsell-Signale</b><div style="font-size:10px;color:var(--muted);margin:2px 0 4px">Ein Klick legt eine Aufgabe an — dann Angebot erstellen &amp; senden.</div>${item.upsellSignals.map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px"><span style="font-size:11px;flex:1">${esc(s)}</span><span style="flex:none;display:flex;gap:4px"><button class="btn bp" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Angebots-Entwurf erstellen &amp; öffnen" onclick="App.upsellToOffer('${pl}','${id}','${encodeURIComponent(s)}')">📄 Angebot</button><button class="btn bg" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Als Aufgabe merken" onclick="App.upsellToTask('${pl}','${id}','${encodeURIComponent(s)}')">+ Aufgabe</button></span></div>`).join("")}</div>`:""}
     ${(pl==="cli"&&((item.careRequests||[]).length||(item.assistantHandoffs||[]).length))?`<div class="infobox" style="margin-top:6px;border-left:3px solid var(--g)"><b style="font-size:11px">📥 Portal-Anfragen des Kunden</b>${(item.careRequests||[]).map(q=>{const done=["freigeschaltet","erledigt","abgelehnt"].includes(q.status);const kl={book:"Buchung",upgrade:"Upgrade",addon:"Zusatz",cancel:"Kündigung",manage:"Änderung"}[q.kind]||"Anfrage";return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px"><span style="font-size:11px;flex:1">💶 ${esc(kl)}: ${esc(q.offerName||"")}${q.note?" — "+esc(q.note):""}</span>${done?`<span class="chip ok" style="font-size:9px">${esc(q.status)}</span>`:(q.kind==="addon"?`<span style="display:flex;gap:4px;flex:none"><button class="btn bp" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Angebot für diese Zusatzleistung erstellen" onclick="App.careReqOffer('${id}','${encodeURIComponent(q.offerName||"")}')">📄 Angebot</button><button class="btn bg" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Direkt aktivieren" onclick="App.careActivate('${id}','${q.id}')">✓</button></span>`:(["book","upgrade"].includes(q.kind)?`<button class="btn bp" style="flex:none;font-size:10px;padding:3px 9px;white-space:nowrap" title="Annehmen & aktivieren (setzt Paket/MRR + Bestätigungsmail)" onclick="App.careActivate('${id}','${q.id}')">✓ Annehmen</button>`:`<button class="btn bg" style="flex:none;font-size:10px;padding:3px 8px" title="Als erledigt markieren" onclick="App.resolveReq('${id}','care','${q.id}')">✓</button>`))}</div>`;}).join("")}${(item.assistantHandoffs||[]).map(h=>{const done=["erledigt","beantwortet"].includes(h.status);return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px"><span style="font-size:11px;flex:1">💬 ${esc(h.question||"")}</span>${done?`<span class="chip ok" style="font-size:9px">${esc(h.status)}</span>`:`<button class="btn bg" style="flex:none;font-size:10px;padding:3px 8px" title="Als erledigt markieren" onclick="App.resolveReq('${id}','handoff','${h.id}')">✓</button>`}</div>`;}).join("")}</div>`:""}
     ${(pl==="cli"&&(item.changeRequests||[]).some(r=>r.feedback))?(()=>{const fbs=(item.changeRequests||[]).filter(r=>r.feedback);const up=fbs.filter(r=>r.feedback.rating==="up").length;const down=fbs.length-up;const neg=fbs.filter(r=>r.feedback.rating==="down");return `<div class="infobox" style="margin-top:6px;${down?'border-left:3px solid var(--red)':''}"><b style="font-size:11px">😊 Zufriedenheit</b> <span style="font-size:11px">👍 ${up} · 👎 ${down}</span>${neg.map(r=>`<div style="font-size:10.5px;color:var(--red);margin-top:3px">👎 ${esc(r.title)}${r.feedback.note?": "+esc(r.feedback.note):""}</div>`).join("")}</div>`;})():""}
-    ${(pl==="cli"&&(item.offers||[]).length)?`<div class="infobox" style="margin-top:6px;border-left:3px solid var(--amb)"><b style="font-size:11px">📄 Angebote</b>${item.offers.slice(0,6).map(o=>{const ok=o.status==="angenommen";return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:5px"><a href="${App.apiBase()}/api/offer/${esc(o.token)}" target="_blank" rel="noopener" style="font-size:11px;flex:1;color:var(--a)">${esc(o.title)} · ${o.total} € ↗</a><a href="${App.apiBase()}/api/offer-mail-preview/${id}/${esc(o.token)}" target="_blank" rel="noopener" title="Angebots-Mail-Vorschau" style="flex:none;font-size:12px;text-decoration:none">👁</a>${ok?"":`<button class="btn bg" style="flex:none;font-size:10px;padding:3px 8px" title="Angebot per E-Mail an den Kunden senden" onclick="App.sendOffer('${id}','${esc(o.token)}')">✉</button>`}<span class="chip ${ok?"ok":(o.status==="gesendet"?"":"")}" style="font-size:9px">${esc(o.status||"offen")}</span></div>`;}).join("")}</div>`:""}
     ${(pl==="cli"&&((item.careRequests||[]).length||(item.changeRequests||[]).length))?(()=>{const KL={book:"gebucht",upgrade:"Upgrade",addon:"Zusatz",cancel:"Kündigung",manage:"Änderung"};const ev=[];(item.careRequests||[]).forEach(q=>ev.push({ts:q.ts,i:"💶",t:"Care "+(KL[q.kind]||"Anfrage")+": "+(q.offerName||"")}));(item.changeRequests||[]).forEach(r=>{ev.push({ts:r.ts,i:"✍️",t:r.title||""});if(r.feedback&&r.feedback.ts)ev.push({ts:r.feedback.ts,i:r.feedback.rating==="up"?"👍":"👎",t:"Bewertung: "+(r.title||"")});});ev.sort((a,b)=>b.ts-a.ts);return `<div class="infobox" style="margin-top:6px"><b style="font-size:11px">🗓️ Care-Historie</b>${ev.slice(0,8).map(e=>`<div style="display:flex;gap:6px;justify-content:space-between;align-items:center;margin-top:4px;font-size:11px"><span>${e.i} ${esc(e.t)}</span><span style="color:var(--muted);white-space:nowrap">${new Date(e.ts).toLocaleDateString("de-DE")}</span></div>`).join("")}</div>`;})():""}
     ${pl==="cli"?`<div style="margin-top:6px;display:flex;gap:14px;flex-wrap:wrap"><a href="${App.apiBase()}/api/care-mail-preview/${id}?kind=book" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">✉ Willkommens-Mail ↗</a><a href="${App.apiBase()}/api/report-preview/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">📊 Monatsbericht-Vorschau ↗</a><a href="${App.apiBase()}/api/care-history/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🗓️ Care-Historie ↗</a></div>`:""}
     <div style="margin-top:8px"><div class="stit" style="font-size:11px">Domain ${item.domain?`<span class="chip ${item.domain.status==='live'?'ok':''}" style="font-size:10px">${esc(item.domain.status)}</span>`:""}</div>
@@ -3291,6 +3290,181 @@ App.init();
     else if(e.key==='Escape'&&el('wwk').style.display==='block'){wwkClose();}
     else if(e.key==='Enter'&&el('wwk').style.display==='block'){var f=el('wwkList').querySelector('.wwk-row');if(f)f.click();}
   });
+})();
+</script>
+<!-- ══ ANGEBOTS-STUDIO (Leitstand) — Angebote für Leads UND Kunden konfigurieren, live ansehen, senden ══ -->
+<style>
+#OS{position:fixed;inset:0;z-index:80;background:rgba(14,10,6,.55);display:none}
+#OS.on{display:block}
+.os{position:absolute;inset:14px;background:#F7F5F0;border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,.35);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+.os-h{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#0E0A06;color:#F1EAD9;flex-wrap:wrap}
+.os-h .t{font:500 20px/1.1 "Cormorant Garamond",Georgia,serif;letter-spacing:.01em;margin-right:auto}.os-h .t small{display:block;font:11px system-ui;color:#C99A45;letter-spacing:.14em;text-transform:uppercase;margin-bottom:2px}
+.os-h button,.os-h select{font:600 12px system-ui;border-radius:999px;padding:8px 14px;border:1px solid rgba(243,221,158,.3);background:transparent;color:#F3DD9E;cursor:pointer}
+.os-h button.pri{background:linear-gradient(180deg,#F3DD9E,#C99A45);color:#1A1206;border:0}.os-h button:disabled{opacity:.5;cursor:wait}
+.os-b{display:grid;grid-template-columns:minmax(380px,500px) 1fr;min-height:0}
+.os-f{overflow:auto;padding:14px 16px 90px;border-right:1px solid #E4DED2;background:#FBFAF7}
+.os-p{display:grid;grid-template-rows:auto 1fr;min-height:0;background:#1C1711}
+.os-pb{display:flex;gap:8px;align-items:center;padding:8px 12px;color:#A89F8C;font-size:12px}.os-pb button{background:none;border:1px solid #3A2F20;color:#D8B46A;border-radius:999px;padding:4px 12px;cursor:pointer;font-size:12px}.os-pb button.on{background:#3A2F20}
+.os-fr{display:flex;justify-content:center;min-height:0;overflow:hidden}.os-fr iframe{border:0;width:100%;height:100%;background:#0e0a06;transition:width .3s}.os-fr.m iframe{width:390px;border-left:1px solid #3A2F20;border-right:1px solid #3A2F20}
+.os details{border:1px solid #E4DED2;border-radius:12px;background:#fff;margin:0 0 10px}.os summary{cursor:pointer;padding:11px 14px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:8px;list-style:none}.os summary::-webkit-details-marker{display:none}
+.os summary small{font-weight:500;color:#8A857D}.os .sec{padding:0 14px 14px}
+.os label{display:block;font-size:11px;color:#7A746B;margin:8px 0 3px;font-weight:600}
+.os input,.os textarea,.os select.in{width:100%;box-sizing:border-box;border:1px solid #DCD5C8;border-radius:8px;padding:8px 10px;font:13px/1.4 system-ui;background:#fff;color:#1A1714}
+.os textarea{min-height:70px;resize:vertical}.os input:focus,.os textarea:focus{outline:2px solid #C99A45;outline-offset:0;border-color:#C99A45}
+.os .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.os .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.os .row{border:1px solid #EFE9DF;border-radius:10px;padding:8px 10px 10px;margin:8px 0;background:#FDFCFA;position:relative}
+.os .row .x{position:absolute;top:6px;right:6px;border:0;background:none;color:#B4ACA0;font-size:16px;cursor:pointer;line-height:1}
+.os .add{border:1px dashed #C99A45;background:none;color:#9C6F2E;border-radius:8px;padding:7px 12px;font:600 12px system-ui;cursor:pointer;margin-top:4px}
+.os .ck{display:flex;gap:6px;align-items:center;font-size:12px;color:#4A443C;margin-top:6px}.os .ck input{width:auto}
+.os-sum{position:sticky;bottom:-90px;margin:14px -16px -90px;padding:12px 16px 16px;background:#0E0A06;color:#F1EAD9;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.os-sum b{font:500 24px/1 "Cormorant Garamond",Georgia,serif;color:#F3DD9E}.os-sum small{display:block;color:#A89F8C;font-size:11px}
+.os .hint{font-size:11px;color:#8A857D;margin-top:4px}
+@media(max-width:900px){.os{inset:0;border-radius:0}.os-b{grid-template-columns:1fr}.os-p{display:none}}
+</style>
+<div id="OS" role="dialog" aria-modal="true" aria-label="Angebots-Studio"></div>
+<script>
+(function(){
+const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const EUR=n=>(Math.round((+n||0)*100)/100).toLocaleString("de-DE",{maximumFractionDigits:2})+" €";
+const rid=()=>Math.random().toString(36).slice(2,9);
+const CARE=[{name:"Care Basis",price:79,features:"Hosting, Domain & SSL\nÜberwachung rund um die Uhr\n1 kleine Änderung pro Monat\nMonatlicher Gesundheits-Bericht"},
+ {name:"Care Plus",price:149,def:true,features:"Alles aus Care Basis\n3 Änderungen pro Monat\nSicherheits- und SEO-Check\nBevorzugter Support"},
+ {name:"Care Premium",price:249,features:"Alles aus Care Plus\nKleine Änderungen ohne Limit\nMonatliches Strategie-Gespräch\nGoogle-Profil-Pflege inklusive"}];
+const OPTS=[{name:"Zusätzliche Unterseite",desc:"Eigene Seite mit Text, Bildern und Kontaktweg",price:190},
+ {name:"Google-Unternehmensprofil einrichten",desc:"Fotos, Zeiten, Leistungen, Verknüpfung mit der Website",price:149},
+ {name:"Online-Terminanfrage",desc:"Formular mit Wunschtermin, landet direkt bei Ihnen",price:290},
+ {name:"Zweite Sprache (Englisch)",desc:"Alle Seiten übersetzt und gepflegt",price:390},
+ {name:"SEO-Pflege",desc:"Laufende Optimierung und Ranking-Bericht",price:49,monthly:true}];
+const PRESETS={
+ start:{label:"Website Start",o:{title:"Ihre neue Website",items:[{name:"Website mit bis zu 5 Seiten",desc:"Individuelles Design, fürs Handy optimiert, schnell und barrierearm",amount:1490},{name:"Inhalte selbst pflegen im Kunden-Portal",desc:"Zeiten, Hinweise und Texte ohne Technikwissen ändern",amount:0},{name:"Domain, Hosting und SSL im ersten Jahr",amount:0},{name:"Impressum und Datenschutz als Vorlage",amount:0}],options:OPTS.slice(0,3),carePlans:CARE,timeline:"Live in 2 bis 3 Wochen nach Ihrer Freigabe",payment:"50 % bei Auftrag, 50 % bei Livegang"}},
+ premium:{label:"Website Premium",o:{title:"Ihre neue Website",items:[{name:"Website mit bis zu 10 Seiten",desc:"Mehrseitig vernetzt, mit Wegführung von der Startseite zu jedem Anliegen",amount:2990},{name:"Bewegtes Titelbild und Detail-Animationen",desc:"Film im Kopfbereich, ruhige Übergänge",amount:0},{name:"Lokale Suchmaschinen-Grundlage",desc:"Seitentitel, Beschreibungen, strukturierte Daten, Google-Anbindung",amount:0},{name:"Inhalte selbst pflegen im Kunden-Portal",amount:0},{name:"Domain, Hosting und SSL im ersten Jahr",amount:0}],options:OPTS,carePlans:CARE,timeline:"Live in 3 bis 4 Wochen nach Ihrer Freigabe",payment:"50 % bei Auftrag, 50 % bei Livegang"}},
+ signature:{label:"Signature",o:{title:"Ihr Signature-Auftritt",items:[{name:"Signature-Website",desc:"Eigene Bildwelt, Film, 3D oder Rundgang, bis zu 15 Seiten",amount:5900},{name:"Eigene Fotos und Filme per KI-Produktion",desc:"Passend zu Ihrem Betrieb, rechtssicher lizenziert",amount:0},{name:"Konzept-Workshop",desc:"90 Minuten, Zielgruppen und Wege auf der Seite",amount:0},{name:"Domain, Hosting und SSL im ersten Jahr",amount:0}],options:OPTS,carePlans:CARE.slice(1),timeline:"Live in 5 bis 6 Wochen",payment:"40 % bei Auftrag, 30 % bei Entwurf, 30 % bei Livegang"}},
+ care:{label:"Nur Betreuung",o:{title:"Ihre Website in guten Händen",items:[{name:"Übernahme und Prüfung Ihrer bestehenden Website",desc:"Sicherheit, Tempo, Erreichbarkeit",amount:0}],carePlans:CARE}},
+ leer:{label:"Leer",o:{title:"",items:[{name:"",amount:""}]}}
+};
+const OS={t:null,o:null,view:"d",prevT:null,dirty:false};
+function ag(){const a=(App.state.settings&&App.state.settings.agency)||{};return{name:a.owner||"Lukas Ackermann",role:"Gründer",phone:a.phone||"",email:a.email||"lukas@orendastudios.de"};}
+function subj(){const t=OS.t;return (t.pl==="acq"?App.state.leads:App.state.clients).find(x=>x.id===t.id)||{};}
+function fresh(key){const p=JSON.parse(JSON.stringify(PRESETS[key||"start"].o));const s=subj();
+ const g=new Date(Date.now()+30*864e5);
+ return Object.assign({title:"",anrede:"",intro:"",items:[],variants:s.demoUrl?[{name:"Ihr Entwurf",url:s.demoUrl,desc:"",tag:"",image:"",price:0}]:[],options:[],carePlans:[],careOptional:false,discount:{label:"",amount:0,pct:0},payment:"",timeline:"",gueltigBis:g.toISOString().slice(0,10),contact:ag(),mailSubject:"",mailMessage:""},p,{title:(p.title||"Ihr Angebot")+(s.name?" · "+s.name:"")});}
+function norm(o){o=JSON.parse(JSON.stringify(o||{}));["items","variants","options","carePlans"].forEach(k=>o[k]=Array.isArray(o[k])?o[k]:[]);
+ o.carePlans.forEach(p=>{if(Array.isArray(p.features))p.features=p.features.join("\n");});o.discount=o.discount||{label:"",amount:0,pct:0};o.contact=o.contact||ag();
+ if(o.items.length&&o.items.every(i=>i.amount==null)&&o.total){o.items[0].amount=o.total;}return o;}
+function calc(o){const items=o.items.filter(i=>i.name);const pr=items.filter(i=>i.amount!==""&&i.amount!=null);let base=pr.length?pr.reduce((s,i)=>s+(+i.amount||0),0):(+o.total||0);
+ const v=o.variants[0];let once=base+(v?+v.price||0:0)+o.options.filter(x=>x.def&&!x.monthly).reduce((s,x)=>s+(+x.price||0),0);
+ const dis=Math.min(once,(+o.discount.amount||0)+once*(+o.discount.pct||0)/100);once-=dis;
+ const plan=o.carePlans.find(p=>p.def)||o.carePlans[0];const mon=(plan?+plan.price||0:(+o.careMonthly||0))+o.options.filter(x=>x.def&&x.monthly).reduce((s,x)=>s+(+x.price||0),0);
+ return{base,once,mon,dis};}
+function payload(){const o=JSON.parse(JSON.stringify(OS.o));o.carePlans.forEach(p=>p.features=String(p.features||"").split("\n").map(s=>s.trim()).filter(Boolean));return o;}
+
+function inp(path,val,ph,type){return `<input ${type?`type="${type}"`:""} data-k="${path}" value="${E(val)}" placeholder="${E(ph||"")}">`;}
+function area(path,val,ph){return `<textarea data-k="${path}" placeholder="${E(ph||"")}">${E(val)}</textarea>`;}
+function ck(path,val,label){return `<label class="ck"><input type="checkbox" data-k="${path}" ${val?"checked":""}> ${label}</label>`;}
+function render(){
+ const o=OS.o,s=subj(),T=calc(o),off=OS.token?(s.offers||[]).find(x=>x.token===OS.token):null;
+ const tpl=((App.state.settings||{}).offerTemplates||[]);
+ document.getElementById("OS").innerHTML=`<div class="os">
+ <div class="os-h"><div class="t"><small>Angebots-Studio${off&&off.nr?" · "+E(off.nr):" · neu"}${off?" · "+E(off.status||"offen"):""}</small>${E(s.name||"")}</div>
+  <select id="os-tpl" title="Vorlage laden"><option value="">Vorlage laden …</option>${Object.entries(PRESETS).map(([k,p])=>`<option value="p:${k}">${p.label}</option>`).join("")}${tpl.map((t,i)=>`<option value="t:${i}">★ ${E(t.name)}</option>`).join("")}</select>
+  <button onclick="OStudio.saveTpl()">Als Vorlage merken</button>
+  <button onclick="OStudio.save()" id="os-save" class="pri">${OS.token?"Änderungen speichern":"Angebot anlegen"}</button>
+  ${OS.token?`<button onclick="OStudio.open()">Kundenansicht ↗</button><button onclick="OStudio.copy()">Link kopieren</button><button onclick="OStudio.mail()">Mail-Vorschau</button><button onclick="OStudio.send()">✉ Senden</button>`:""}
+  <button onclick="OStudio.close()" aria-label="Schließen" style="font-size:16px;padding:4px 12px">×</button></div>
+ <div class="os-b"><div class="os-f" id="os-form">
+ ${off&&off.questions&&off.questions.length?`<details open><summary>❓ Rückfragen des Kunden <small>${off.questions.length}</small></summary><div class="sec">${off.questions.slice().reverse().map(q=>`<div class="row"><div style="font-size:11px;color:#8A857D">${new Date(q.ts).toLocaleString("de-DE")} ${E(q.name||"")} ${E(q.email||"")}</div><div style="font-size:13px;margin-top:3px">${E(q.text)}</div></div>`).join("")}</div></details>`:""}
+ ${off?`<div class="hint" style="margin:0 0 10px">${off.views?`👀 ${off.views}× geöffnet, zuletzt ${new Date(off.lastViewedAt||off.viewedAt).toLocaleString("de-DE")}`:"Noch nicht geöffnet"}${off.sentAt?` · gesendet ${new Date(off.sentAt).toLocaleDateString("de-DE")} an ${E(off.sentTo||"")}`:""}${off.declineReason?` · Absage: ${E(off.declineReason)}`:""}</div>`:""}
+ <details open><summary>Grundlagen</summary><div class="sec">
+  <label>Titel</label>${inp("title",o.title,"Ihre neue Website")}
+  <label>Anrede</label>${inp("anrede",o.anrede,"Sehr geehrte Frau …, / Hallo …,")}
+  <label>Persönliche Nachricht (steht oben im Angebot)</label>${area("intro",o.intro,"Wie besprochen …")}
+  <div class="g2"><div><label>Gültig bis</label>${inp("gueltigBis",o.gueltigBis,"","date")}</div><div><label>Zeitplan</label>${inp("timeline",o.timeline,"Live in 2 bis 3 Wochen")}</div></div>
+  <label>Zahlungsbedingungen</label>${inp("payment",o.payment,"50 % bei Auftrag, 50 % bei Livegang")}
+ </div></details>
+ <details open><summary>Leistungen <small>${EUR(T.base)}</small></summary><div class="sec">
+  ${o.items.map((it,i)=>`<div class="row"><button class="x" onclick="OStudio.del('items',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 110px"><div><label>Leistung</label>${inp(`items.${i}.name`,it.name)}</div><div><label>Betrag € (0 = inkl.)</label>${inp(`items.${i}.amount`,it.amount,"0")}</div></div><label>Beschreibung</label>${inp(`items.${i}.desc`,it.desc,"optional")}</div>`).join("")}
+  <button class="add" onclick="OStudio.add('items')">+ Leistung</button></div></details>
+ <details ${o.variants.length?"open":""}><summary>Design-Varianten zur Auswahl <small>${o.variants.length||"keine"}</small></summary><div class="sec"><div class="hint">Der Kunde sieht jede Variante mit Bild und Live-Link und wählt eine. Die erste gilt als vorausgewählt.</div>
+  ${o.variants.map((v,i)=>`<div class="row"><button class="x" onclick="OStudio.del('variants',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 120px"><div><label>Name</label>${inp(`variants.${i}.name`,v.name,"Ruhe und Vertrauen")}</div><div><label>Aufpreis €</label>${inp(`variants.${i}.price`,v.price,"0")}</div></div>
+   <div class="g2"><div><label>Live-Link</label>${inp(`variants.${i}.url`,v.url,"https://…")}</div><div><label>Vorschaubild (Link)</label>${inp(`variants.${i}.image`,v.image,"https://…/vorschau.jpg")}</div></div>
+   <div class="g2" style="grid-template-columns:1fr 130px"><div><label>Kurzbeschreibung</label>${inp(`variants.${i}.desc`,v.desc)}</div><div><label>Etikett</label>${inp(`variants.${i}.tag`,v.tag,"Empfehlung")}</div></div>
+   ${i?`<button class="add" style="border-style:solid" onclick="OStudio.up(${i})">↑ nach vorn (vorauswählen)</button>`:""}</div>`).join("")}
+  <button class="add" onclick="OStudio.add('variants')">+ Variante</button></div></details>
+ <details ${o.options.length?"open":""}><summary>Zusatzoptionen <small>${o.options.length||"keine"}</small></summary><div class="sec">
+  ${o.options.map((x,i)=>`<div class="row"><button class="x" onclick="OStudio.del('options',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 100px"><div><label>Option</label>${inp(`options.${i}.name`,x.name)}</div><div><label>Preis €</label>${inp(`options.${i}.price`,x.price,"0")}</div></div><label>Beschreibung</label>${inp(`options.${i}.desc`,x.desc,"optional")}<div style="display:flex;gap:14px">${ck(`options.${i}.monthly`,x.monthly,"monatlich")}${ck(`options.${i}.def`,x.def,"vorausgewählt")}</div></div>`).join("")}
+  <button class="add" onclick="OStudio.add('options')">+ Option</button> <button class="add" onclick="OStudio.stdOpts()">Standard-Optionen</button></div></details>
+ <details ${o.carePlans.length?"open":""}><summary>Betreuung (Care) <small>${o.carePlans.length?o.carePlans.length+" Pakete":"keine"}</small></summary><div class="sec">
+  ${o.carePlans.map((p,i)=>`<div class="row"><button class="x" onclick="OStudio.del('carePlans',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 100px"><div><label>Paket</label>${inp(`carePlans.${i}.name`,p.name)}</div><div><label>€ / Monat</label>${inp(`carePlans.${i}.price`,p.price)}</div></div><label>Leistungen (eine pro Zeile)</label>${area(`carePlans.${i}.features`,p.features)}${ck(`carePlans.${i}.def`,p.def,"vorausgewählt")}</div>`).join("")}
+  <button class="add" onclick="OStudio.add('carePlans')">+ Paket</button> <button class="add" onclick="OStudio.stdCare()">Standard-Pakete</button>
+  ${ck("careOptional",o.careOptional,"„Ohne Betreuung“ wählbar")}</div></details>
+ <details ${(o.discount.amount||o.discount.pct)?"open":""}><summary>Nachlass <small>${T.dis?"− "+EUR(T.dis):"keiner"}</small></summary><div class="sec"><div class="g3"><div><label>Bezeichnung</label>${inp("discount.label",o.discount.label,"Erstkunden-Nachlass")}</div><div><label>Betrag €</label>${inp("discount.amount",o.discount.amount,"0")}</div><div><label>oder %</label>${inp("discount.pct",o.discount.pct,"0")}</div></div></div></details>
+ <details><summary>Ansprechpartner</summary><div class="sec"><div class="g2"><div><label>Name</label>${inp("contact.name",o.contact.name)}</div><div><label>Rolle</label>${inp("contact.role",o.contact.role)}</div><div><label>Telefon</label>${inp("contact.phone",o.contact.phone)}</div><div><label>E-Mail</label>${inp("contact.email",o.contact.email)}</div></div></div></details>
+ <details><summary>E-Mail an den Kunden</summary><div class="sec"><label>Empfänger</label><input id="os-to" value="${E(s.email||s.portalEmail||"")}" placeholder="name@betrieb.de"><label>Betreff</label>${inp("mailSubject",o.mailSubject,"Ihr Angebot: "+(o.title||""))}<label>Nachricht (sonst Standardtext)</label>${area("mailMessage",o.mailMessage,"wie besprochen erhalten Sie hier Ihr persönliches Angebot …")}<div class="hint">Anrede, Angebots-Karte mit Summe, Knopf und Signatur setzt das System automatisch.</div></div></details>
+ <div class="os-sum"><div><small>Einmalig (mit Vorauswahl)</small><b>${EUR(T.once)}</b></div><div style="text-align:right"><small>danach monatlich</small><b>${EUR(T.mon)}</b></div></div>
+ </div>
+ <div class="os-p"><div class="os-pb">Live-Vorschau <button class="${OS.view==="d"?"on":""}" onclick="OStudio.vw('d')">Desktop</button><button class="${OS.view==="m"?"on":""}" onclick="OStudio.vw('m')">Handy</button><span id="os-st" style="margin-left:auto"></span></div><div class="os-fr ${OS.view==="m"?"m":""}"><iframe id="os-if" title="Vorschau"></iframe></div></div>
+ </div></div>`;
+ const f=document.getElementById("os-form");
+ f.addEventListener("input",onInput);f.addEventListener("change",onInput);
+ document.getElementById("os-tpl").onchange=e=>{const v=e.target.value;if(!v)return;if(OS.dirty&&!confirm("Vorlage laden? Aktuelle Eingaben werden ersetzt."))return e.target.value="";
+  if(v.startsWith("p:"))OS.o=Object.assign(fresh(v.slice(2)),{contact:OS.o.contact,anrede:OS.o.anrede,intro:OS.o.intro,variants:OS.o.variants});else OS.o=norm(tpl[+v.slice(2)].offer);OS.dirty=true;render();};
+ preview();
+}
+function setK(path,val){const ks=path.split(".");let o=OS.o;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks[ks.length-1]]=val;}
+function onInput(e){const k=e.target.dataset.k;if(!k)return;let v=e.target.type==="checkbox"?e.target.checked:e.target.value;
+ if(e.target.type==="checkbox"&&/^carePlans\.\d+\.def$/.test(k)&&v)OS.o.carePlans.forEach(p=>p.def=false);
+ setK(k,v);OS.dirty=true;
+ const T=calc(OS.o);const sm=document.querySelector(".os-sum");if(sm)sm.querySelectorAll("b")[0].textContent=EUR(T.once),sm.querySelectorAll("b")[1].textContent=EUR(T.mon);
+ if(e.type==="change"&&e.target.type==="checkbox")render();else{clearTimeout(OS.prevT);OS.prevT=setTimeout(preview,650);}}
+async function preview(){const st=document.getElementById("os-st");if(st)st.textContent="aktualisiere …";
+ try{const r=await fetch(App.apiBase()+"/api/client/offer-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId:OS.t.id,token:OS.token,offer:payload()})});
+  const h=await r.text();const fr=document.getElementById("os-if");if(fr){const y=fr.contentWindow&&fr.contentWindow.scrollY||0;fr.srcdoc=h;fr.onload=()=>{try{fr.contentWindow.scrollTo(0,y)}catch(e){}};}
+  if(st)st.textContent=r.ok?"":"Vorschau-Fehler "+r.status;}catch(e){if(st)st.textContent="offline";}}
+window.OStudio={
+ open0(pl,id,token){OS.t={pl,id};OS.token=token||null;OS.dirty=false;const s=subj();const off=token?(s.offers||[]).find(x=>x.token===token):null;
+  OS.o=off?norm(off):fresh("start");if(off&&!OS.o.contact.name)OS.o.contact=ag();document.getElementById("OS").classList.add("on");document.body.style.overflow="hidden";render();},
+ dup(pl,id,token){this.open0(pl,id,token);OS.token=null;OS.o.title=OS.o.title;OS.dirty=true;render();App.toast("Kopie: Änderungen anpassen, dann „Angebot anlegen“");},
+ close(){if(OS.dirty&&!confirm("Ungespeicherte Änderungen verwerfen?"))return;document.getElementById("OS").classList.remove("on");document.getElementById("OS").innerHTML="";document.body.style.overflow="";},
+ add(k){const d={items:{name:"",desc:"",amount:""},variants:{name:"",url:"",image:"",desc:"",tag:"",price:0},options:{name:"",desc:"",price:0,monthly:false,def:false},carePlans:{name:"",price:0,features:"",def:!OS.o.carePlans.length}}[k];OS.o[k].push(Object.assign({id:rid()},d));OS.dirty=true;render();},
+ del(k,i){OS.o[k].splice(i,1);OS.dirty=true;render();},
+ up(i){const v=OS.o.variants.splice(i,1)[0];OS.o.variants.unshift(v);OS.dirty=true;render();},
+ stdCare(){OS.o.carePlans=JSON.parse(JSON.stringify(CARE));OS.dirty=true;render();},
+ stdOpts(){OS.o.options=JSON.parse(JSON.stringify(OPTS));OS.dirty=true;render();},
+ vw(v){OS.view=v;const fr=document.querySelector(".os-fr");if(fr)fr.classList.toggle("m",v==="m");document.querySelectorAll(".os-pb button").forEach((b,i)=>b.classList.toggle("on",(i===0)===(v==="d")));},
+ async save(){const b=document.getElementById("os-save");b.disabled=true;
+  try{const r=await fetch(App.apiBase()+"/api/client/offer-save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId:OS.t.id,token:OS.token,offer:payload(),reopen:true})});const d=await r.json();
+   if(!r.ok||!d.ok)throw new Error(d.error||r.status);OS.token=d.token;OS.dirty=false;await App.reloadCloudState();if(App.detail)App.renderDrawer();render();App.toast("✓ Angebot "+(d.nr||"")+" gespeichert");return true;}
+  catch(e){App.toast("Fehler: "+e.message);b.disabled=false;return false;}},
+ async ensure(){if(!OS.token||OS.dirty)return await this.save();return true;},
+ url(){return App.apiBase()+"/api/offer/"+OS.token;},
+ async open(){if(await this.ensure())window.open(this.url()+"?preview=1","_blank");},
+ async copy(){if(await this.ensure())App.copyText(this.url(),"Angebotslink kopiert");},
+ async mail(){if(await this.ensure())window.open(App.apiBase()+"/api/offer-mail-preview/"+OS.t.id+"/"+OS.token,"_blank");},
+ async send(){if(!(await this.ensure()))return;const to=(document.getElementById("os-to")||{}).value||"";
+  if(!/^[^@ ]+@[^@ ]+[.][^@ ]+$/.test(to.trim())){App.toast("Bitte Empfänger-E-Mail eintragen (Abschnitt E-Mail)");return;}
+  if(!confirm("Angebot jetzt per E-Mail an "+to.trim()+" senden?"))return;
+  try{const r=await fetch(App.apiBase()+"/api/client/offer-send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId:OS.t.id,token:OS.token,to:to.trim()})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||r.status);
+   await App.reloadCloudState();if(App.detail)App.renderDrawer();render();App.toast(d.mailed?"✓ Angebot an "+d.to+" gesendet":"Markiert, Mail evtl. nicht zugestellt");}catch(e){App.toast("Fehler: "+e.message);}},
+ saveTpl(){const n=prompt("Name der Vorlage:",OS.o.title||"Meine Vorlage");if(!n)return;const st=App.state;st.settings=st.settings||{};st.settings.offerTemplates=(st.settings.offerTemplates||[]).filter(t=>t.name!==n);
+  const o=payload();delete o.intro;delete o.anrede;delete o.mailMessage;delete o.mailSubject;o.variants=[];st.settings.offerTemplates.push({name:n,offer:o});App.persist();App.toast("✓ Vorlage „"+n+"“ gemerkt");render();},
+ async withdraw(pl,id,token){if(!confirm("Angebot zurückziehen? Der Link zeigt dann „nicht mehr aktuell“."))return;
+  try{const r=await fetch(App.apiBase()+"/api/client/offer-remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId:id,token})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||r.status);await App.reloadCloudState();if(App.detail)App.renderDrawer();App.toast("Angebot zurückgezogen");}catch(e){App.toast("Fehler: "+e.message);}}
+};
+// Angebots-Karte im Detail-Drawer (Leads + Kunden)
+App.offerPanel=function(item,pl){
+ const offers=item.offers||[];const base=App.apiBase();
+ const chip=o=>{const m={angenommen:["✓ angenommen","#2F9E44"],abgelehnt:["✋ abgesagt","#E03131"],"zurückgezogen":["zurückgezogen","#9AA4AC"],gesendet:[o.viewedAt?"👀 geöffnet":"✉ gesendet",o.viewedAt?"#B8893A":"#6B767F"],offen:[o.viewedAt?"👀 geöffnet":"Entwurf","#6B767F"]}[o.status||"offen"]||[o.status,"#6B767F"];return `<span style="font-size:10px;font-weight:700;color:${m[1]}">${m[0]}</span>`;};
+ const tot=o=>{const t=o.acceptedTotal!=null?o.acceptedTotal:o.total;const mo=o.acceptedMonthly!=null?o.acceptedMonthly:((o.carePlans&&o.carePlans.length)?((o.carePlans.find(p=>p.def)||o.carePlans[0]).price):o.careMonthly);return fmt(t)+" €"+(mo?" + "+fmt(mo)+" €/M":"");};
+ return `<div style="border:1px solid #E7E1D6;border-radius:12px;padding:12px 14px;margin:4px 0 14px;background:linear-gradient(180deg,#FFFDF8,#fff)">
+ <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div class="stit" style="color:#9C6F2E;font-size:11px">📄 ANGEBOTE${offers.length?" · "+offers.length:""}</div><button class="btn bp" style="font-size:11px;padding:5px 12px;background:linear-gradient(180deg,#F3DD9E,#C99A45);color:#1A1206;border:0" onclick="OStudio.open0('${pl}','${item.id}')">+ Angebot konfigurieren</button></div>
+ ${offers.slice(0,8).map(o=>`<div style="border:1px solid #EFE9DF;border-radius:9px;padding:8px 10px;margin:7px 0 0;font-size:12px;background:#fff">
+  <div style="display:flex;justify-content:space-between;gap:8px"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.nr?`<span style="color:#9C6F2E;font-weight:600">${esc(o.nr)}</span> `:""}${esc(o.title)}</b><span style="white-space:nowrap">${tot(o)}</span></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">${chip(o)}${o.views?`<span style="font-size:10px;color:#9AA4AC">${o.views}× angesehen</span>`:""}${(o.questions||[]).length?`<span style="font-size:10px;color:#E03131;font-weight:700">❓ ${o.questions.length} Rückfrage${o.questions.length>1?"n":""}</span>`:""}${(o.variants||[]).length>1?`<span style="font-size:10px;color:#9AA4AC">${o.variants.length} Varianten</span>`:""}${o.choice&&o.variants?`<span style="font-size:10px">Gewählt: <b>${esc(((o.variants.find(v=>v.id===o.choice.variant))||{}).name||"")}</b></span>`:""}
+  <span style="margin-left:auto;display:flex;gap:8px">${o.status!=="angenommen"?`<a href="#" onclick="event.preventDefault();OStudio.open0('${pl}','${item.id}','${esc(o.token)}')" style="color:#9C6F2E">bearbeiten</a>`:""}<a href="#" onclick="event.preventDefault();OStudio.dup('${pl}','${item.id}','${esc(o.token)}')" style="color:#9C6F2E">kopieren</a><a href="${base}/api/offer/${esc(o.token)}?preview=1" target="_blank" rel="noopener" style="color:#9C6F2E">ansehen</a>${!["angenommen","zurückgezogen"].includes(o.status)?`<a href="#" onclick="event.preventDefault();OStudio.withdraw('${pl}','${item.id}','${esc(o.token)}')" style="color:#9AA4AC">zurückziehen</a>`:""}</span></div></div>`).join("")}
+ ${!offers.length?`<div style="font-size:12px;color:#8A857D;margin-top:6px">Noch kein Angebot. Vorlagen: Start, Premium, Signature, Nur Betreuung, oder eigene.</div>`:""}
+ </div>`;
+};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.getElementById("OS").classList.contains("on"))OStudio.close();});
 })();
 </script>
 </body>
