@@ -888,7 +888,7 @@ rHeute(){
  const openTasks=[];
  [...s.leads.map(l=>({it:l,pl:"acq"})),...s.clients.map(c=>({it:c,pl:"cli"}))].forEach(({it,pl})=>{(it.tasks||[]).forEach(t=>{if(!t.done&&t.due&&t.due<=today())openTasks.push({taskId:t.id,text:t.text,due:t.due,name:it.name,pl,itemId:it.id});});});
  openTasks.sort((a,b)=>(a.due<b.due?-1:1));
- document.getElementById("v-heute").innerHTML=`<div id="prop-box"></div>
+ document.getElementById("v-heute").innerHTML=`${(()=>{try{return this.cockpitHtml?this.cockpitHtml():""}catch(e){console.warn("Cockpit",e);return ""}})()}<div id="prop-box"></div>
   <div class="panel"><div class="ph">⚡ Fokus heute · max. 5 · Wert × Dringlichkeit</div>
    ${foc.length?foc.map((f,i)=>`<button class="fi" onclick="App.show('${f.g}')"><span class="fn">${i+1}</span><span style="color:${f.p>=90?"var(--red)":"var(--a)"}">●</span><span class="ft">${esc(f.t)}</span><span class="fc">${f.c}</span><span style="color:#C5CCD1">›</span></button>`).join("")
    :`<div class="empty">Alles abgearbeitet – neuen Lead-Finder-Lauf starten.</div>`}
@@ -3465,6 +3465,89 @@ App.offerPanel=function(item,pl){
  </div>`;
 };
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.getElementById("OS").classList.contains("on"))OStudio.close();});
+})();
+</script>
+<!-- ══ ORENDA-MARKE + COCKPIT (Leitstand) ══ -->
+<style>
+/* Marke: Tinte + Gold statt Alt-Orange */
+:root{--a:#8A6322;--gold:#C99A45;--gold2:#F3DD9E;--inkx:#0E0A06}
+body{background:linear-gradient(180deg,#F5F2EC 0%,#EEEAE2 100%)}
+aside{background:linear-gradient(180deg,#0E0A06,#16110b 60%,#1d160d);border-right:1px solid rgba(243,221,158,.12)}
+aside .brand{border-bottom-color:rgba(243,221,158,.12)}
+aside .brand .eye{color:var(--gold);font-family:inherit;letter-spacing:.28em}
+aside .brand .tit{color:#F7EAD0;font-family:"Cormorant Garamond",Georgia,serif;font-weight:500;font-size:22px;letter-spacing:.01em}
+aside nav a{color:#CFC3AA}aside nav a:hover{background:rgba(243,221,158,.07);color:#F7EAD0}
+aside nav a.active{background:linear-gradient(180deg,#F3DD9E,#C99A45);color:#1A1206;box-shadow:0 6px 18px rgba(201,154,69,.25)}
+aside .ng{color:rgba(243,221,158,.4)}
+aside .sf{border-top-color:rgba(243,221,158,.12);color:#8f846f}aside .sf .law{color:rgba(243,221,158,.45)}aside .sf button{color:#a89f8c}
+header{background:#FFFDF8;border-bottom-color:#E7E1D6}
+.hst .hl{color:#9C8F78}
+.btn.ba:hover:not(:disabled){box-shadow:0 5px 16px rgba(138,99,34,.32)}
+.panel{border-color:#E7E1D6}.ph{color:#8A7A5C}
+/* Cockpit */
+.ck{margin-bottom:14px}
+.ck-band{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:rgba(243,221,158,.14);border-radius:14px;overflow:hidden;border:1px solid rgba(243,221,158,.18);box-shadow:0 14px 34px rgba(14,10,6,.18)}
+.ck-band>div{background:radial-gradient(260px 120px at 100% 0,rgba(201,154,69,.16),transparent 70%),#0E0A06;padding:16px 18px;color:#F1EAD9}
+.ck-band .l{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C99A45}
+.ck-band .v{font-family:"Cormorant Garamond",Georgia,serif;font-size:32px;line-height:1.1;color:#F7EAD0;margin-top:4px}
+.ck-band .s{font-size:11.5px;color:#A89F8C;margin-top:2px}
+.ck-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;margin-top:14px}
+.ck-card{background:#FFFDF8;border:1px solid #E7E1D6;border-radius:12px;padding:14px 16px}
+.ck-card h4{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8A7A5C;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between}
+.fun{display:grid;gap:7px}.fun .r{display:grid;grid-template-columns:110px 1fr 38px;gap:10px;align-items:center;font-size:12px}
+.fun .b{height:20px;border-radius:5px;background:linear-gradient(90deg,#C99A45,#E6C67F);min-width:3px}.fun .r:nth-child(n+4) .b{background:linear-gradient(90deg,#8A6322,#C99A45)}.fun .r:last-child .b{background:linear-gradient(90deg,#2f7a4a,#58b57c)}
+.fun .n{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.act{display:flex;align-items:flex-end;gap:4px;height:92px}.act div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;height:100%}
+.act i{display:block;width:100%;border-radius:4px 4px 1px 1px;background:linear-gradient(180deg,#E6C67F,#C99A45)}.act div:last-child i{background:#0E0A06}.act span{font-size:9px;color:#9C8F78}
+.donut{display:flex;gap:14px;align-items:center}.donut svg{width:110px;height:110px;flex:none}
+.leg{display:grid;gap:5px;font-size:12px}.leg span{display:flex;align-items:center;gap:7px}.leg i{width:10px;height:10px;border-radius:3px;flex:none}
+.hl2{display:grid;gap:6px;max-height:140px;overflow:auto}.hl2 .r{display:flex;align-items:center;gap:9px;font-size:12px;cursor:pointer}.hl2 .r:hover b{text-decoration:underline}
+.hl2 .g{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:12px;flex:none}
+.hl2 b{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hl2 small{color:#9C8F78}
+@media(max-width:1200px){.ck-band{grid-template-columns:repeat(3,1fr)}.ck-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.ck-band{grid-template-columns:1fr 1fr}.ck-grid{grid-template-columns:1fr}}
+</style>
+<script>
+(function(){
+const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const EUR=n=>new Intl.NumberFormat("de-DE",{maximumFractionDigits:0}).format(Math.round(+n||0))+" €";
+function offerOnce(o){if(o.acceptedTotal!=null)return +o.acceptedTotal;return +o.total||0;}
+App.cockpitHtml=function(){
+ const s=this.state,now=Date.now(),D=864e5,L=s.leads||[],C=s.clients||[];
+ const mrr=C.reduce((a,c)=>a+(+c.mrr||0),0);
+ const openStages=["sales_ready","letter_sent","engaged","in_conversation","offer_sent","negotiation"];
+ const allOffers=[...L.flatMap(l=>(l.offers||[]).map(o=>({o,n:l.name,id:l.id,pl:"acq"}))),...C.flatMap(c=>(c.offers||[]).map(o=>({o,n:c.name,id:c.id,pl:"cli"})))];
+ const openOff=allOffers.filter(x=>!["angenommen","abgelehnt","zurückgezogen"].includes(x.o.status||"offen"));
+ const pipe=openOff.reduce((a,x)=>a+offerOnce(x.o),0);
+ const viewed=openOff.filter(x=>x.o.viewedAt).length;
+ const won30=allOffers.filter(x=>x.o.status==="angenommen"&&x.o.acceptedAt>now-30*D);
+ const wonVal=won30.reduce((a,x)=>a+offerOnce(x.o),0);
+ const ready=L.filter(l=>openStages.includes(l.stage)).length;
+ const band=`<div class="ck-band">
+  <div><div class="l">Monatlich (MRR)</div><div class="v">${EUR(mrr)}</div><div class="s">${C.filter(c=>+c.mrr>0).length} Kunden in Betreuung · ${EUR(mrr*12)} im Jahr</div></div>
+  <div><div class="l">Angebote offen</div><div class="v">${EUR(pipe)}</div><div class="s">${openOff.length} Angebot${openOff.length===1?"":"e"} · ${viewed} geöffnet</div></div>
+  <div><div class="l">Gewonnen · 30 Tage</div><div class="v">${EUR(wonVal)}</div><div class="s">${won30.length} Abschluss${won30.length===1?"":"e"}</div></div>
+  <div><div class="l">Heiße Leads</div><div class="v">${L.filter(l=>["engaged","in_conversation","offer_sent","negotiation"].includes(l.stage)).length}</div><div class="s">${ready} verkaufsbereit oder im Gespräch</div></div>
+  <div><div class="l">Kunden</div><div class="v">${C.length}</div><div class="s">${C.filter(c=>c.phase==="at_risk").length} mit Risiko · ${L.length} Leads im System</div></div></div>`;
+ // Trichter
+ const grp=[["Gefunden",["discovered","researching","twin_ready"]],["Demo gebaut",["build_queue","build_running","qa","review_needed","blocked","sales_ready"]],["Kontakt",["letter_sent","engaged","in_conversation"]],["Angebot",["offer_sent","negotiation"]]];
+ const cnt=grp.map(([n,st])=>[n,L.filter(l=>st.includes(l.stage)).length]);cnt.push(["Kunde",C.length]);
+ const mx=Math.max(1,...cnt.map(x=>x[1]));
+ const fun=`<div class="ck-card"><h4>Vertriebstrichter<span>${L.length+C.length} gesamt</span></h4><div class="fun">${cnt.map(([n,v])=>`<div class="r"><span>${n}</span><div class="b" style="width:${Math.max(1,Math.round(Math.sqrt(v/mx)*100))}%"></div><span class="n">${v}</span></div>`).join("")}</div></div>`;
+ // Aktivität 14 Tage
+ const days=[...Array(14)].map((_,i)=>{const d0=new Date(now-(13-i)*D);d0.setHours(0,0,0,0);return d0.getTime();});
+ const ev=days.map(t=>(s.events||[]).filter(e=>e.ts>=t&&e.ts<t+D).length);const emx=Math.max(1,...ev);
+ const act=`<div class="ck-card"><h4>Aktivität · 14 Tage<span>${ev.reduce((a,b)=>a+b,0)} Ereignisse</span></h4><div class="act">${ev.map((v,i)=>`<div title="${new Date(days[i]).toLocaleDateString("de-DE")}: ${v}"><i style="height:${Math.max(3,Math.round(v/emx*100))}%"></i><span>${new Date(days[i]).getDate()}</span></div>`).join("")}</div></div>`;
+ // Angebots-Donut
+ const cats=[["Entwurf","#D9CFBC",x=>(x.o.status||"offen")==="offen"&&!x.o.viewedAt],["Gesendet","#C99A45",x=>x.o.status==="gesendet"&&!x.o.viewedAt],["Geöffnet","#8A6322",x=>!["angenommen","abgelehnt","zurückgezogen"].includes(x.o.status)&&x.o.viewedAt],["Angenommen","#2F7A4A",x=>x.o.status==="angenommen"],["Abgesagt","#B84A3A",x=>["abgelehnt","zurückgezogen"].includes(x.o.status)]].map(([n,c,f])=>[n,c,allOffers.filter(f).length]);
+ const tot=Math.max(1,cats.reduce((a,c)=>a+c[2],0));let acc=0;const R=40,CI=2*Math.PI*R;
+ const segs=cats.filter(c=>c[2]).map(([n,c,v])=>{const len=v/tot*CI;const sg=`<circle cx="55" cy="55" r="${R}" fill="none" stroke="${c}" stroke-width="16" stroke-dasharray="${len.toFixed(2)} ${(CI-len).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}" transform="rotate(-90 55 55)"/>`;acc+=len;return sg;}).join("");
+ const don=`<div class="ck-card"><h4>Angebote<span>${allOffers.length} insgesamt</span></h4><div class="donut"><svg viewBox="0 0 110 110" role="img" aria-label="Angebotsstatus"><circle cx="55" cy="55" r="${R}" fill="none" stroke="#F0EBE1" stroke-width="16"/>${segs}<text x="55" y="52" text-anchor="middle" style="font:500 24px Georgia,serif;fill:#1A1206">${allOffers.length}</text><text x="55" y="68" text-anchor="middle" style="font:600 8px system-ui;fill:#8A7A5C;letter-spacing:.1em">ANGEBOTE</text></svg><div class="leg">${cats.map(([n,c,v])=>`<span><i style="background:${c}"></i>${n} · <b>${v}</b></span>`).join("")}</div></div></div>`;
+ // Kunden-Gesundheit
+ const gc={A:"#2F7A4A",B:"#5b9e2f",C:"#C99A45",D:"#B8662A",F:"#B84A3A"};
+ const hl=`<div class="ck-card" style="grid-column:span 1"><h4>Kunden-Gesundheit<span>${C.filter(c=>c.wpHealth).length} überwacht</span></h4><div class="hl2">${C.length?C.map(c=>{const g=c.wpHealth&&c.wpHealth.grade;return `<div class="r" onclick="App.openDetail('cli','${c.id}')"><span class="g" style="background:${gc[g]||"#C5BBA8"}">${g||"?"}</span><b>${E(c.name)}</b><small>${c.wpHealth&&c.wpHealth.ms!=null?c.wpHealth.ms+" ms":"ungeprüft"}${+c.mrr?" · "+EUR(c.mrr):""}</small></div>`;}).join(""):'<div style="font-size:12px;color:#9C8F78">Noch keine Kunden.</div>'}</div></div>`;
+ return `<div class="ck">${band}<div class="ck-grid">${fun}${act}${don}</div><div class="ck-grid" style="grid-template-columns:1fr">${hl}</div></div>`;
+};
 })();
 </script>
 </body>
