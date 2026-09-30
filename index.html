@@ -1692,6 +1692,7 @@ renderDrawer(){
   </div>
   <div class="drb">
    ${App.kitHtml(item)}
+   ${App.leadIntel?App.leadIntel(item,pl):""}
    ${App.offerPanel?App.offerPanel(item,pl):""}
    ${pl==="cli"?(()=>{const cs=App.careScore(item);const g=item.wpHealth&&item.wpHealth.grade;const gc={A:"var(--g)",B:"#5b9e2f",C:"var(--amb)",D:"#e8704a",F:"var(--red)"}[g]||"#9AA4AC";const fbs=(item.changeRequests||[]).filter(r=>r.feedback);const sat=fbs.length?Math.round(fbs.filter(r=>r.feedback.rating==="up").length/fbs.length*100)+"%":"–";const tile=(v,l,c)=>`<div style="flex:1;text-align:center;padding:9px 4px"><div style="font-size:18px;font-weight:800;color:${c||"#1a1a18"}">${v}</div><div style="font-size:9px;color:#9AA4AC;text-transform:uppercase;letter-spacing:.04em;margin-top:1px">${l}</div></div>`;const sep='<div style="width:1px;background:#ece9e6"></div>';return `<div style="display:flex;flex:none;background:#faf9f8;border:1px solid #ece9e6;border-radius:12px;margin-bottom:12px;overflow:hidden">${tile(cs.score,"Care-Score",cs.color)}${sep}${tile(g||"–","Website",gc)}${sep}${tile(sat,"Zufrieden","#1a1a18")}${sep}${tile(fmt(item.mrr)+"€","MRR","#1a1a18")}</div>`;})():""}
    ${pl==="cli"?(()=>{const steps=[["Portal-E-Mail hinterlegt",!!item.email],["Einladung gesendet",!!item.portalInvitedAt],["Kunde eingeloggt",!!item.portalToken],["Website live",!!(item.liveUrl||item.demoUrl)],["Erste Rechnung gestellt",!!((item.invoices||[]).length)],["Care-Paket aktiv",["care_active","growth","renewal"].includes(item.phase)||+item.mrr>0]];const done=steps.filter(s=>s[1]).length;if(done===steps.length)return "";return `<div class="infobox" style="margin-top:8px;margin-bottom:2px"><b style="font-size:11px">🚀 Onboarding · ${done}/${steps.length}</b><div style="height:5px;background:#eee;border-radius:3px;margin:6px 0;overflow:hidden"><div style="height:100%;width:${Math.round(done/steps.length*100)}%;background:var(--g)"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 12px">${steps.map(s=>`<div style="font-size:11px;color:${s[1]?"var(--muted)":"#1a1a18"};font-weight:${s[1]?"400":"600"}">${s[1]?"✅":"⬜"} ${s[0]}</div>`).join("")}</div></div>`;})():""}
@@ -3580,6 +3581,47 @@ App.cockpitHtml=function(){
 };
 // Klick auf eine Lead-Gruppe: Akquise-Ansicht mit diesem Tag gefiltert öffnen
 App.ckGroup=function(t){try{this.show("akquise");if(this.setFlt)this.setFlt("akquise","tag",t);}catch(e){console.warn(e);}};
+})();
+</script>
+<!-- ══ LEAD-STECKBRIEF (Leitstand) — Website-Check, Anschrift, Automatik-Schritte ══ -->
+<style>
+.li-box{border:1px solid #E7E1D6;border-radius:12px;padding:12px 14px;margin:4px 0 14px;background:#fff}
+.li-box h5{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8A7A5C;margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.li-need{display:flex;gap:10px;align-items:flex-start}
+.li-score{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px}
+.li-why{font-size:12px;line-height:1.5;color:#3d3528}.li-why li{margin:0 0 2px 16px}
+.li-row{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:8px;color:#5a5244}.li-row b{color:#1A1206}
+.li-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.li-steps button,.li-steps a{border:1px solid #E7E1D6;background:#FFFDF8;border-radius:9px;padding:7px 6px;font-size:11px;cursor:pointer;text-align:center;color:#1A1206;text-decoration:none;line-height:1.3}
+.li-steps .done{background:#EEF6F0;border-color:#BFDCC8;color:#1F5C36}.li-steps .next{background:linear-gradient(180deg,#F3DD9E,#C99A45);border:0;font-weight:700}
+.li-steps small{display:block;color:#8A7A5C;font-size:9.5px}
+@media(max-width:560px){.li-steps{grid-template-columns:1fr 1fr}}
+</style>
+<script>
+(function(){
+const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+App.leadIntel=function(item,pl){
+ if(pl!=="acq")return "";
+ const wc=item.websiteCheck,a=item.address,tags=item.tags||[];
+ if(!wc&&!a&&!item.contactName)return "";
+ const n=wc?+wc.need||0:0;
+ const col=n>=6?"#B84A3A":n>=4?"#B8662A":n>=2?"#C99A45":"#2F7A4A";
+ const why=wc&&wc.why?String(wc.why).split(";").map(s=>s.trim()).filter(Boolean):[];
+ const off=(item.offers||[])[0];const base=App.apiBase();
+ const auto=tags.includes("Automatik · 1. Welle")||/Automatik/.test((item.next&&item.next.label)||"");
+ const hasDemo=!!item.demoUrl;
+ const steps=[
+  ["Entwurf",hasDemo?`<a class="done" href="${E(item.demoUrl)}" target="_blank" rel="noopener">✓ Entwurf<small>ansehen</small></a>`:`<button class="next" onclick="App.runFactory('${item.id}')">Factory starten<small>ca. 20 Min., ~1–3 €</small></button>`],
+  ["Angebot",off?`<button class="done" onclick="OStudio.open0('acq','${item.id}','${E(off.token)}')">✓ Angebot<small>${E(off.nr||"öffnen")}</small></button>`:`<button class="${hasDemo?"next":""}" onclick="OStudio.open0('acq','${item.id}')">Angebot<small>aus Vorlage</small></button>`],
+  ["Brief",off?`<a class="${off.sentAt||off.viaQr?"done":"next"}" href="${base}/api/offer/${E(off.token)}/brief" target="_blank" rel="noopener">Brief<small>drucken</small></a>`:`<button disabled>Brief<small>nach Angebot</small></button>`],
+  ["Signal",off?`<button class="${off.viewedAt?"done":""}" onclick="OStudio.open0('acq','${item.id}','${E(off.token)}')">${off.viewedAt?"👀 geöffnet":"wartet"}<small>${off.viaQr?off.viaQr+"× per Brief":(off.views?off.views+"× angesehen":"noch nicht")}</small></button>`:`<button disabled>Signal<small>—</small></button>`]
+ ];
+ return `<div class="li-box"><h5><span>🔎 Steckbrief</span>${auto?'<span style="color:#9C6F2E">Automatik-Akquise</span>':""}</h5>
+ ${wc?`<div class="li-need"><div class="li-score" style="background:${col}" title="Handlungsbedarf der Website (0 bis 10)">${n}</div><div><div style="font-size:12px;font-weight:700">${n>=5?"Website dringend erneuerungsbedürftig":n>=3?"Website mit deutlichen Mängeln":n>=1?"kleinere Mängel":"Website in Ordnung"}</div>${why.length?`<ul class="li-why">${why.map(w=>`<li>${E(w)}</li>`).join("")}</ul>`:""}</div></div>`:""}
+ <div class="li-row">${item.contactName?`<span>👤 <b>${E(item.contactName)}</b></span>`:""}${a&&a.street?`<span>📮 ${E(a.street)}, ${E(a.plz||"")} ${E(a.ort||"")}</span>`:""}${item.phone?`<a href="tel:${E(String(item.phone).replace(/[^\d+]/g,""))}">📞 ${E(item.phone)}</a>`:""}${item.email?`<a href="mailto:${E(item.email)}">✉ ${E(item.email)}</a>`:""}${item.website?`<a href="${E(/^https?:/.test(item.website)?item.website:"http://"+item.website)}" target="_blank" rel="noopener">🌐 alte Website</a>`:""}</div>
+ ${(auto||hasDemo||off)?`<div class="li-steps">${steps.map(s=>s[1]).join("")}</div>`:""}
+ </div>`;
+};
 })();
 </script>
 </body>
