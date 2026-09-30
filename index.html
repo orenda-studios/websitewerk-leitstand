@@ -343,7 +343,7 @@ nav a.active{box-shadow:0 4px 12px rgba(26,37,48,.28)}
    Drittanbieter-Calls (Cloudflare, Nominatim, Overpass) bleiben unberührt. */
 (function(){
   var _f=window.fetch.bind(window);
-  function base(){try{var c=JSON.parse(localStorage.getItem("ww:cfg")||"{}");return (c.apiUrl||"https://websitewerk-api.onrender.com").replace(/\/$/,"");}catch(e){return "https://websitewerk-api.onrender.com";}}
+  function base(){try{var c=JSON.parse(localStorage.getItem("ww:cfg")||"{}");var u=c.apiUrl||"https://api.orendastudios.de";if(/onrender\.com|websitewerk/i.test(u))u="https://api.orendastudios.de";return u.replace(/\/$/,"");}catch(e){return "https://api.orendastudios.de";}}
   window.fetch=function(input,init){
     try{
       var url=typeof input==="string"?input:(input&&input.url)||"";
@@ -1132,7 +1132,7 @@ closeFactory(){if(this.fact?._poll)clearInterval(this.fact._poll);if(this.fact?.
 /* === Hauptdurchlauf === */
 async runFactory(lid){
  const lead=this.state.leads.find(l=>l.id===lid);if(!lead)return;
- const apiBase=(this.cfg.apiUrl||"https://websitewerk-api.onrender.com").replace(/\/$/,"");
+ const apiBase=(this.cfg.apiUrl||"https://api.orendastudios.de").replace(/\/$/,"");
  /* Prüfen ob Backend erreichbar */
  try{const h=await fetch(apiBase+"/health");if(!h.ok)throw new Error(h.status);}
  catch(e){this.toast("Backend nicht erreichbar ("+apiBase+") – Einstellungen prüfen");this.show("einstellungen");return;}
@@ -1439,7 +1439,7 @@ async sendPingenBrief(lid){
  const lead=this.state.leads.find(l=>l.id===lid);
  if(!lead?.briefText){this.toast("Kein Brief vorhanden");return;}
  if(!confirm(`Brief an "${lead.name}" via Pingen versenden? Kosten: ~1,50–2,50 €`))return;
- const apiBase=(this.cfg.apiUrl||"https://websitewerk-api.onrender.com").replace(/\/$/,"");
+ const apiBase=(this.cfg.apiUrl||"https://api.orendastudios.de").replace(/\/$/,"");
  try{
   const r=await fetch(apiBase+"/api/factory/pingen",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({leadId:lid,absName:this.cfg.absName,absFirma:this.cfg.absFirma,absOrt:this.cfg.absOrt})});
@@ -1460,7 +1460,7 @@ localDemo(lid){
  window.open(URL.createObjectURL(new Blob([startHtml],{type:"text/html"})),"_blank");
 },
 
-apiBase(){return (this.cfg.apiUrl||"https://websitewerk-api.onrender.com").replace(/\/$/,"");},
+apiBase(){let u=this.cfg.apiUrl||"https://api.orendastudios.de";if(/onrender\.com|websitewerk/i.test(u))u="https://api.orendastudios.de";return u.replace(/\/$/,"");},
 async reloadFromCloud(){
   this.toast("Lade Cloud-Daten…");
   const cloud=await this.sbLoadViaBackend()||(this.cfg.sbUrl&&this.cfg.sbKey?await this.sbLoad():null);
@@ -1927,7 +1927,7 @@ renderDrawer(){
     ${(pl==="cli"&&(["care_active","growth","renewal"].includes(item.phase)||+item.mrr>0)&&item.phase!=="at_risk")?(()=>{const last=evs.length?evs[0].ts:(item.wonAt||0);const days=last?Math.floor((Date.now()-last)/864e5):999;const neg=(item.changeRequests||[]).some(r=>r.feedback&&r.feedback.rating==="down");if(days>45||neg){const rs=[];if(neg)rs.push("negatives Feedback");if(days>45)rs.push("inaktiv seit "+days+" Tagen");return `<div class="infobox" style="margin-top:8px;border-left:3px solid var(--amb)"><b style="font-size:11px;color:var(--amb)">⚠ Aufmerksamkeit nötig</b><div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(rs.join(" · "))} — proaktiv nachfassen.</div></div>`;}return "";})():""}
     ${(pl==="cli"&&!(item.liveUrl||item.demoUrl||(item.wpSite&&(item.wpSite.pageUrl||item.wpSite.url))))?`<div class="infobox" style="margin-top:8px;border-left:3px solid var(--red)"><b style="font-size:11px;color:var(--red)">⚠ Keine Live-URL hinterlegt</b><div style="font-size:11px;color:var(--muted);margin:3px 0 6px">Health-, SEO- & Barrierefreiheits-Reports laufen ohne URL nicht.</div><div style="display:flex;gap:6px"><input id="liveurl-${id}" placeholder="https://kunde.pages.dev" style="flex:1;border:1px solid #CBD2D6;border-radius:6px;padding:6px 8px;font-size:12px"><button class="btn bp" style="flex:none;font-size:11px;padding:4px 10px" onclick="App.setLiveUrl('${id}')">Speichern</button></div></div>`:""}
     ${item.wpSite?`<div class="infobox" style="margin-top:8px"><b>🟦 WordPress live</b><br><a href="${esc(item.wpSite.pageUrl||item.wpSite.url)}" target="_blank" rel="noopener" style="color:var(--a);font-weight:600;font-size:12px">${esc(item.wpSite.pageUrl||item.wpSite.url)} ↗</a><div style="font-size:10px;color:var(--muted);margin-top:2px">${item.wpSite.level?esc(item.wpSite.level)+" · ":""}${item.wpSite.pages?item.wpSite.pages+" Seiten · ":""}${new Date(item.wpSite.publishedAt).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div></div>`:""}
-    ${item.wpHealth?`<div class="infobox" style="margin-top:8px"><b>${item.wpHealth.ok?"🟢 Seite gesund":item.wpHealth.reachable?"🟡 Hinweise":"🔴 Offline"}</b>${item.wpHealth.grade?` · <span style="font-weight:700;color:${({A:"var(--g)",B:"#5b9e2f",C:"var(--amb)",D:"#e8704a",F:"var(--red)"}[item.wpHealth.grade])||"var(--muted)"}">Note ${item.wpHealth.grade}</span>`:""}${item.wpHealth.ms!=null?` · ${item.wpHealth.ms} ms`:""}${item.wpHealth.https?" · HTTPS":""}${typeof item.wpHealth.sslDaysLeft==="number"?` · SSL ${item.wpHealth.sslDaysLeft<0?"abgelaufen":item.wpHealth.sslDaysLeft+" T."}`:""}${item.wpHealth.security&&typeof item.wpHealth.security.score==="number"?` · Sicherheit ${item.wpHealth.security.score}/5`:""}${item.wpHealth.fortress?" · Festung ✓":""}${(item.wpHealth.issues||[]).length?`<br><span style="font-size:11px;color:var(--red)">⚠ ${item.wpHealth.issues.map(esc).join(" · ")}</span>`:""}${(item.wpHealth.warnings||[]).length?`<br><span style="font-size:11px;color:var(--amb)">${item.wpHealth.warnings.map(esc).join(" · ")}</span>`:""}<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><a href="https://websitewerk-api.onrender.com/api/security-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🔐 Sicherheits-Report ↗</a><a href="https://websitewerk-api.onrender.com/api/linkcheck-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🔗 Link-Report ↗</a><a href="https://websitewerk-api.onrender.com/api/seo-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🔍 SEO-Report ↗</a><a href="https://websitewerk-api.onrender.com/api/a11y-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">♿ Barrierefreiheit ↗</a></div>${App.healthSpark(item.healthHistory)}<div style="font-size:10px;color:var(--muted);margin-top:2px">geprüft ${new Date(item.wpHealth.checkedAt).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div></div>`:""}
+    ${item.wpHealth?`<div class="infobox" style="margin-top:8px"><b>${item.wpHealth.ok?"🟢 Seite gesund":item.wpHealth.reachable?"🟡 Hinweise":"🔴 Offline"}</b>${item.wpHealth.grade?` · <span style="font-weight:700;color:${({A:"var(--g)",B:"#5b9e2f",C:"var(--amb)",D:"#e8704a",F:"var(--red)"}[item.wpHealth.grade])||"var(--muted)"}">Note ${item.wpHealth.grade}</span>`:""}${item.wpHealth.ms!=null?` · ${item.wpHealth.ms} ms`:""}${item.wpHealth.https?" · HTTPS":""}${typeof item.wpHealth.sslDaysLeft==="number"?` · SSL ${item.wpHealth.sslDaysLeft<0?"abgelaufen":item.wpHealth.sslDaysLeft+" T."}`:""}${item.wpHealth.security&&typeof item.wpHealth.security.score==="number"?` · Sicherheit ${item.wpHealth.security.score}/5`:""}${item.wpHealth.fortress?" · Festung ✓":""}${(item.wpHealth.issues||[]).length?`<br><span style="font-size:11px;color:var(--red)">⚠ ${item.wpHealth.issues.map(esc).join(" · ")}</span>`:""}${(item.wpHealth.warnings||[]).length?`<br><span style="font-size:11px;color:var(--amb)">${item.wpHealth.warnings.map(esc).join(" · ")}</span>`:""}<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><a href="https://api.orendastudios.de/api/security-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🔐 Sicherheits-Report ↗</a><a href="https://api.orendastudios.de/api/linkcheck-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🔗 Link-Report ↗</a><a href="https://api.orendastudios.de/api/seo-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">🔍 SEO-Report ↗</a><a href="https://api.orendastudios.de/api/a11y-report/${id}" target="_blank" rel="noopener" style="font-size:10.5px;color:var(--a);font-weight:600">♿ Barrierefreiheit ↗</a></div>${App.healthSpark(item.healthHistory)}<div style="font-size:10px;color:var(--muted);margin-top:2px">geprüft ${new Date(item.wpHealth.checkedAt).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div></div>`:""}
     ${(item.upsellSignals||[]).length?`<div class="infobox" style="margin-top:6px;border-left:3px solid var(--a)"><b style="font-size:11px">📈 Upsell-Signale</b><div style="font-size:10px;color:var(--muted);margin:2px 0 4px">Ein Klick legt eine Aufgabe an — dann Angebot erstellen &amp; senden.</div>${item.upsellSignals.map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px"><span style="font-size:11px;flex:1">${esc(s)}</span><span style="flex:none;display:flex;gap:4px"><button class="btn bp" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Angebots-Entwurf erstellen &amp; öffnen" onclick="App.upsellToOffer('${pl}','${id}','${encodeURIComponent(s)}')">📄 Angebot</button><button class="btn bg" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Als Aufgabe merken" onclick="App.upsellToTask('${pl}','${id}','${encodeURIComponent(s)}')">+ Aufgabe</button></span></div>`).join("")}</div>`:""}
     ${(pl==="cli"&&((item.careRequests||[]).length||(item.assistantHandoffs||[]).length))?`<div class="infobox" style="margin-top:6px;border-left:3px solid var(--g)"><b style="font-size:11px">📥 Portal-Anfragen des Kunden</b>${(item.careRequests||[]).map(q=>{const done=["freigeschaltet","erledigt","abgelehnt"].includes(q.status);const kl={book:"Buchung",upgrade:"Upgrade",addon:"Zusatz",cancel:"Kündigung",manage:"Änderung"}[q.kind]||"Anfrage";return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px"><span style="font-size:11px;flex:1">💶 ${esc(kl)}: ${esc(q.offerName||"")}${q.note?" — "+esc(q.note):""}</span>${done?`<span class="chip ok" style="font-size:9px">${esc(q.status)}</span>`:(q.kind==="addon"?`<span style="display:flex;gap:4px;flex:none"><button class="btn bp" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Angebot für diese Zusatzleistung erstellen" onclick="App.careReqOffer('${id}','${encodeURIComponent(q.offerName||"")}')">📄 Angebot</button><button class="btn bg" style="font-size:10px;padding:3px 8px;white-space:nowrap" title="Direkt aktivieren" onclick="App.careActivate('${id}','${q.id}')">✓</button></span>`:(["book","upgrade"].includes(q.kind)?`<button class="btn bp" style="flex:none;font-size:10px;padding:3px 9px;white-space:nowrap" title="Annehmen & aktivieren (setzt Paket/MRR + Bestätigungsmail)" onclick="App.careActivate('${id}','${q.id}')">✓ Annehmen</button>`:`<button class="btn bg" style="flex:none;font-size:10px;padding:3px 8px" title="Als erledigt markieren" onclick="App.resolveReq('${id}','care','${q.id}')">✓</button>`))}</div>`;}).join("")}${(item.assistantHandoffs||[]).map(h=>{const done=["erledigt","beantwortet"].includes(h.status);return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px"><span style="font-size:11px;flex:1">💬 ${esc(h.question||"")}</span>${done?`<span class="chip ok" style="font-size:9px">${esc(h.status)}</span>`:`<button class="btn bg" style="flex:none;font-size:10px;padding:3px 8px" title="Als erledigt markieren" onclick="App.resolveReq('${id}','handoff','${h.id}')">✓</button>`}</div>`;}).join("")}</div>`:""}
     ${(pl==="cli"&&(item.changeRequests||[]).some(r=>r.feedback))?(()=>{const fbs=(item.changeRequests||[]).filter(r=>r.feedback);const up=fbs.filter(r=>r.feedback.rating==="up").length;const down=fbs.length-up;const neg=fbs.filter(r=>r.feedback.rating==="down");return `<div class="infobox" style="margin-top:6px;${down?'border-left:3px solid var(--red)':''}"><b style="font-size:11px">😊 Zufriedenheit</b> <span style="font-size:11px">👍 ${up} · 👎 ${down}</span>${neg.map(r=>`<div style="font-size:10.5px;color:var(--red);margin-top:3px">👎 ${esc(r.title)}${r.feedback.note?": "+esc(r.feedback.note):""}</div>`).join("")}</div>`;})():""}
@@ -2878,8 +2878,8 @@ rSettings(){
   </div><div class="panel">
   <div class="cfg-sec">
    <div class="stit" style="color:var(--a);font-size:11px">🟢 BACKEND API (Render) – alle Keys laufen sicher serverseitig</div>
-   <p class="hint" style="margin-bottom:10px">Dein Backend läuft auf Render (<b>websitewerk-api.onrender.com</b>). Claude-Key, Pexels-Key, Cloudflare-Token – alles liegt dort als Environment Variable, nie im Browser. Hier nur die Backend-URL eintragen. Wenn dein Render-Service eine eigene Domain hat, diese verwenden.</p>
-   <div class="mf"><label>Backend API URL</label><input id="c-api" placeholder="https://websitewerk-api.onrender.com" value="${esc(c.apiUrl||"https://websitewerk-api.onrender.com")}"></div>
+   <p class="hint" style="margin-bottom:10px">Dein Backend läuft auf Render unter <b>api.orendastudios.de</b>. Claude-Key, Pexels-Key, Cloudflare-Token – alles liegt dort als Environment Variable, nie im Browser. Hier nur die Backend-URL eintragen. Wenn dein Render-Service eine eigene Domain hat, diese verwenden.</p>
+   <div class="mf"><label>Backend API URL</label><input id="c-api" placeholder="https://api.orendastudios.de" value="${esc(c.apiUrl||"https://api.orendastudios.de")}"></div>
    <button class="btn bg bsm" style="margin-top:6px" onclick="App.testBackend()">Backend jetzt testen</button>
    <div class="mf" style="margin-top:12px"><label>Leitstand-Schlüssel (x-ww-key)</label><input id="c-wwkey" type="password" placeholder="= LEITSTAND_SECRET aus Render" value="${esc(localStorage.getItem('ww_api_key')||'')}"></div>
    <div style="font-size:11px;color:#9AA4AC;margin-top:3px;line-height:1.5">Pflicht für Cloud-Sync, Factory-Runs &amp; Deploy-Downloads. Wert = die Render-Variable <code>LEITSTAND_SECRET</code> (Render → Service → Environment). Danach „Alles speichern" + Seite neu laden.</div>
@@ -3002,7 +3002,7 @@ async saveSettings(){
  this.updSync();this.toast("Einstellungen gespeichert ✓");
 },
 async testBackend(){
- const url=(this.cfg.apiUrl||"https://websitewerk-api.onrender.com").replace(/\/$/,"");
+ const url=(this.cfg.apiUrl||"https://api.orendastudios.de").replace(/\/$/,"");
  this.toast("Teste Backend…");
  try{
   const h=await fetch(url+"/health");
@@ -3314,6 +3314,9 @@ App.init();
 .os .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.os .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .os .row{border:1px solid #EFE9DF;border-radius:10px;padding:8px 10px 10px;margin:8px 0;background:#FDFCFA;position:relative}
 .os .row .x{position:absolute;top:6px;right:6px;border:0;background:none;color:#B4ACA0;font-size:16px;cursor:pointer;line-height:1}
+.os .row{padding-left:26px}.os .row .grip{position:absolute;left:6px;top:50%;transform:translateY(-50%);cursor:grab;color:#C9BFAE;font-size:16px;user-select:none;padding:6px 2px}.os .row .grip:hover{color:#9C6F2E}
+.os .row .mv{position:absolute;top:6px;right:28px;display:flex;gap:2px}.os .row .mv button{border:0;background:none;color:#B4ACA0;cursor:pointer;font-size:13px;padding:0 3px}.os .row .mv button:hover{color:#9C6F2E}
+.os .row.drag{opacity:.4}.os .row.over{box-shadow:0 -3px 0 #C99A45}.os .row.over.after{box-shadow:0 3px 0 #C99A45}
 .os .add{border:1px dashed #C99A45;background:none;color:#9C6F2E;border-radius:8px;padding:7px 12px;font:600 12px system-ui;cursor:pointer;margin-top:4px}
 .os .ck{display:flex;gap:6px;align-items:center;font-size:12px;color:#4A443C;margin-top:6px}.os .ck input{width:auto}
 .os-sum{position:sticky;bottom:-90px;margin:14px -16px -90px;padding:12px 16px 16px;background:#0E0A06;color:#F1EAD9;display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -3382,19 +3385,19 @@ function render(){
   <label>Zahlungsbedingungen</label>${inp("payment",o.payment,"50 % bei Auftrag, 50 % bei Livegang")}
  </div></details>
  <details open><summary>Leistungen <small>${EUR(T.base)}</small></summary><div class="sec">
-  ${o.items.map((it,i)=>`<div class="row"><button class="x" onclick="OStudio.del('items',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 110px"><div><label>Leistung</label>${inp(`items.${i}.name`,it.name)}</div><div><label>Betrag € (0 = inkl.)</label>${inp(`items.${i}.amount`,it.amount,"0")}</div></div><label>Beschreibung</label>${inp(`items.${i}.desc`,it.desc,"optional")}</div>`).join("")}
+  ${o.items.map((it,i)=>`<div class="row" data-dl="items" data-di="${i}"><span class="grip" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span><span class="mv"><button type="button" onclick="OStudio.move('items',${i},-1)" aria-label="Nach oben">↑</button><button type="button" onclick="OStudio.move('items',${i},1)" aria-label="Nach unten">↓</button></span><button class="x" onclick="OStudio.del('items',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 110px"><div><label>Leistung</label>${inp(`items.${i}.name`,it.name)}</div><div><label>Betrag € (0 = inkl.)</label>${inp(`items.${i}.amount`,it.amount,"0")}</div></div><label>Beschreibung</label>${inp(`items.${i}.desc`,it.desc,"optional")}</div>`).join("")}
   <button class="add" onclick="OStudio.add('items')">+ Leistung</button></div></details>
  <details ${o.variants.length?"open":""}><summary>Design-Varianten zur Auswahl <small>${o.variants.length||"keine"}</small></summary><div class="sec"><div class="hint">Der Kunde sieht jede Variante mit Bild und Live-Link und wählt eine. Die erste gilt als vorausgewählt.</div>
-  ${o.variants.map((v,i)=>`<div class="row"><button class="x" onclick="OStudio.del('variants',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 120px"><div><label>Name</label>${inp(`variants.${i}.name`,v.name,"Ruhe und Vertrauen")}</div><div><label>Aufpreis €</label>${inp(`variants.${i}.price`,v.price,"0")}</div></div>
+  ${o.variants.map((v,i)=>`<div class="row" data-dl="variants" data-di="${i}"><span class="grip" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span><span class="mv"><button type="button" onclick="OStudio.move('variants',${i},-1)" aria-label="Nach oben">↑</button><button type="button" onclick="OStudio.move('variants',${i},1)" aria-label="Nach unten">↓</button></span><button class="x" onclick="OStudio.del('variants',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 120px"><div><label>Name</label>${inp(`variants.${i}.name`,v.name,"Ruhe und Vertrauen")}</div><div><label>Aufpreis €</label>${inp(`variants.${i}.price`,v.price,"0")}</div></div>
    <div class="g2"><div><label>Live-Link</label>${inp(`variants.${i}.url`,v.url,"https://…")}</div><div><label>Vorschaubild (Link)</label>${inp(`variants.${i}.image`,v.image,"https://…/vorschau.jpg")}</div></div>
    <div class="g2" style="grid-template-columns:1fr 130px"><div><label>Kurzbeschreibung</label>${inp(`variants.${i}.desc`,v.desc)}</div><div><label>Etikett</label>${inp(`variants.${i}.tag`,v.tag,"Empfehlung")}</div></div>
    ${i?`<button class="add" style="border-style:solid" onclick="OStudio.up(${i})">↑ nach vorn (vorauswählen)</button>`:""}</div>`).join("")}
   <button class="add" onclick="OStudio.add('variants')">+ Variante</button></div></details>
  <details ${o.options.length?"open":""}><summary>Zusatzoptionen <small>${o.options.length||"keine"}</small></summary><div class="sec">
-  ${o.options.map((x,i)=>`<div class="row"><button class="x" onclick="OStudio.del('options',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 100px"><div><label>Option</label>${inp(`options.${i}.name`,x.name)}</div><div><label>Preis €</label>${inp(`options.${i}.price`,x.price,"0")}</div></div><label>Beschreibung</label>${inp(`options.${i}.desc`,x.desc,"optional")}<div style="display:flex;gap:14px">${ck(`options.${i}.monthly`,x.monthly,"monatlich")}${ck(`options.${i}.def`,x.def,"vorausgewählt")}</div></div>`).join("")}
+  ${o.options.map((x,i)=>`<div class="row" data-dl="options" data-di="${i}"><span class="grip" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span><span class="mv"><button type="button" onclick="OStudio.move('options',${i},-1)" aria-label="Nach oben">↑</button><button type="button" onclick="OStudio.move('options',${i},1)" aria-label="Nach unten">↓</button></span><button class="x" onclick="OStudio.del('options',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 100px"><div><label>Option</label>${inp(`options.${i}.name`,x.name)}</div><div><label>Preis €</label>${inp(`options.${i}.price`,x.price,"0")}</div></div><label>Beschreibung</label>${inp(`options.${i}.desc`,x.desc,"optional")}<div style="display:flex;gap:14px">${ck(`options.${i}.monthly`,x.monthly,"monatlich")}${ck(`options.${i}.def`,x.def,"vorausgewählt")}</div></div>`).join("")}
   <button class="add" onclick="OStudio.add('options')">+ Option</button> <button class="add" onclick="OStudio.stdOpts()">Standard-Optionen</button></div></details>
  <details ${o.carePlans.length?"open":""}><summary>Betreuung (Care) <small>${o.carePlans.length?o.carePlans.length+" Pakete":"keine"}</small></summary><div class="sec">
-  ${o.carePlans.map((p,i)=>`<div class="row"><button class="x" onclick="OStudio.del('carePlans',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 100px"><div><label>Paket</label>${inp(`carePlans.${i}.name`,p.name)}</div><div><label>€ / Monat</label>${inp(`carePlans.${i}.price`,p.price)}</div></div><label>Leistungen (eine pro Zeile)</label>${area(`carePlans.${i}.features`,p.features)}${ck(`carePlans.${i}.def`,p.def,"vorausgewählt")}</div>`).join("")}
+  ${o.carePlans.map((p,i)=>`<div class="row" data-dl="carePlans" data-di="${i}"><span class="grip" title="Ziehen zum Sortieren" aria-hidden="true">⠿</span><span class="mv"><button type="button" onclick="OStudio.move('carePlans',${i},-1)" aria-label="Nach oben">↑</button><button type="button" onclick="OStudio.move('carePlans',${i},1)" aria-label="Nach unten">↓</button></span><button class="x" onclick="OStudio.del('carePlans',${i})" aria-label="Entfernen">×</button><div class="g2" style="grid-template-columns:1fr 100px"><div><label>Paket</label>${inp(`carePlans.${i}.name`,p.name)}</div><div><label>€ / Monat</label>${inp(`carePlans.${i}.price`,p.price)}</div></div><label>Leistungen (eine pro Zeile)</label>${area(`carePlans.${i}.features`,p.features)}${ck(`carePlans.${i}.def`,p.def,"vorausgewählt")}</div>`).join("")}
   <button class="add" onclick="OStudio.add('carePlans')">+ Paket</button> <button class="add" onclick="OStudio.stdCare()">Standard-Pakete</button>
   ${ck("careOptional",o.careOptional,"„Ohne Betreuung“ wählbar")}</div></details>
  <details ${(o.discount.amount||o.discount.pct)?"open":""}><summary>Nachlass <small>${T.dis?"− "+EUR(T.dis):"keiner"}</small></summary><div class="sec"><div class="g3"><div><label>Bezeichnung</label>${inp("discount.label",o.discount.label,"Erstkunden-Nachlass")}</div><div><label>Betrag €</label>${inp("discount.amount",o.discount.amount,"0")}</div><div><label>oder %</label>${inp("discount.pct",o.discount.pct,"0")}</div></div></div></details>
@@ -3428,6 +3431,7 @@ window.OStudio={
  add(k){const d={items:{name:"",desc:"",amount:""},variants:{name:"",url:"",image:"",desc:"",tag:"",price:0},options:{name:"",desc:"",price:0,monthly:false,def:false},carePlans:{name:"",price:0,features:"",def:!OS.o.carePlans.length}}[k];OS.o[k].push(Object.assign({id:rid()},d));OS.dirty=true;render();},
  del(k,i){OS.o[k].splice(i,1);OS.dirty=true;render();},
  up(i){const v=OS.o.variants.splice(i,1)[0];OS.o.variants.unshift(v);OS.dirty=true;render();},
+ move(k,i,d){const a=OS.o[k],j=i+d;if(j<0||j>=a.length)return;const x=a.splice(i,1)[0];a.splice(j,0,x);OS.dirty=true;render();},
  stdCare(){OS.o.carePlans=JSON.parse(JSON.stringify(CARE));OS.dirty=true;render();},
  stdOpts(){OS.o.options=JSON.parse(JSON.stringify(OPTS));OS.dirty=true;render();},
  vw(v){OS.view=v;const fr=document.querySelector(".os-fr");if(fr)fr.classList.toggle("m",v==="m");document.querySelectorAll(".os-pb button").forEach((b,i)=>b.classList.toggle("on",(i===0)===(v==="d")));},
@@ -3465,6 +3469,12 @@ App.offerPanel=function(item,pl){
  </div>`;
 };
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.getElementById("OS").classList.contains("on"))OStudio.close();});
+document.addEventListener("mousedown",e=>{const g=e.target.closest&&e.target.closest("#OS .row .grip");if(g)g.parentElement.draggable=true;});
+document.addEventListener("dragstart",e=>{const r=e.target.closest&&e.target.closest("#OS .row[data-dl]");if(!r)return;OS.dragK=r.dataset.dl;OS.dragI=+r.dataset.di;r.classList.add("drag");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain","x")}catch(_){}});
+document.addEventListener("dragover",e=>{const r=e.target.closest&&e.target.closest("#OS .row[data-dl]");if(!r||r.dataset.dl!==OS.dragK)return;e.preventDefault();document.querySelectorAll("#OS .row.over").forEach(x=>{if(x!==r)x.classList.remove("over","after")});const b=r.getBoundingClientRect();r.classList.add("over");r.classList.toggle("after",e.clientY>b.top+b.height/2);});
+document.addEventListener("drop",e=>{const r=e.target.closest&&e.target.closest("#OS .row[data-dl]");if(!r||r.dataset.dl!==OS.dragK)return;e.preventDefault();const k=OS.dragK,from=OS.dragI;let to=+r.dataset.di;if(r.classList.contains("after"))to++;if(from<to)to--;const a=OS.o[k];const x=a.splice(from,1)[0];a.splice(to,0,x);OS.dirty=true;OS.dragK=null;render();});
+document.addEventListener("dragend",()=>{document.querySelectorAll("#OS .row").forEach(x=>{x.classList.remove("drag","over","after");x.draggable=false;});});
+
 })();
 </script>
 <!-- ══ ORENDA-MARKE + COCKPIT (Leitstand) ══ -->
@@ -3486,6 +3496,8 @@ header{background:#FFFDF8;border-bottom-color:#E7E1D6}
 .panel{border-color:#E7E1D6}.ph{color:#8A7A5C}
 /* Cockpit */
 .ck{margin-bottom:14px}
+.ck-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}.ck-top b{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8A7A5C}
+.ck-rng{display:inline-flex;background:#fff;border:1px solid #E7E1D6;border-radius:999px;padding:3px;gap:2px}.ck-rng button{border:0;background:none;border-radius:999px;padding:6px 12px;font-size:12px;color:#6b604c;cursor:pointer}.ck-rng button.on{background:#0E0A06;color:#F3DD9E}
 .ck-band{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:rgba(243,221,158,.14);border-radius:14px;overflow:hidden;border:1px solid rgba(243,221,158,.18);box-shadow:0 14px 34px rgba(14,10,6,.18)}
 .ck-band>div{background:radial-gradient(260px 120px at 100% 0,rgba(201,154,69,.16),transparent 70%),#0E0A06;padding:16px 18px;color:#F1EAD9}
 .ck-band .l{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C99A45}
@@ -3512,42 +3524,61 @@ header{background:#FFFDF8;border-bottom-color:#E7E1D6}
 const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EUR=n=>new Intl.NumberFormat("de-DE",{maximumFractionDigits:0}).format(Math.round(+n||0))+" €";
 function offerOnce(o){if(o.acceptedTotal!=null)return +o.acceptedTotal;return +o.total||0;}
+const RANGES=[["7","7 Tage"],["30","30 Tage"],["90","90 Tage"],["365","12 Monate"],["all","Gesamt"]];
+App.setCkRange=function(v){try{localStorage.setItem("ck_range",v)}catch(e){}this.rHeute();};
+// Balken passend zum Zeitraum: Tage (7/30), Wochen (90), Monate (12 Monate, Gesamt)
+function buckets(range,now,D,firstTs){
+ const M=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+ if(range==="7"||range==="30"){const n=+range;return [...Array(n)].map((_,i)=>{const a=new Date(now-(n-1-i)*D);a.setHours(0,0,0,0);return {a:a.getTime(),b:a.getTime()+D,l:String(a.getDate()),t:a.toLocaleDateString("de-DE")};});}
+ if(range==="90"){return [...Array(13)].map((_,i)=>{const e=new Date(now-(12-i)*7*D);e.setHours(0,0,0,0);const b=e.getTime()+D,a=b-7*D;const d=new Date(a);return {a,b,l:i===12?"jetzt":d.getDate()+"."+(d.getMonth()+1),t:"Woche ab "+d.toLocaleDateString("de-DE")};});}
+ let n=12;if(range==="all"){const f=new Date(firstTs||now),t=new Date(now);n=Math.min(36,Math.max(1,(t.getFullYear()-f.getFullYear())*12+t.getMonth()-f.getMonth()+1));}
+ return [...Array(n)].map((_,i)=>{const d=new Date(now);d.setDate(1);d.setHours(0,0,0,0);d.setMonth(d.getMonth()-(n-1-i));const e=new Date(d);e.setMonth(e.getMonth()+1);return {a:d.getTime(),b:e.getTime(),l:M[d.getMonth()],t:M[d.getMonth()]+" "+d.getFullYear()};});
+}
 App.cockpitHtml=function(){
  const s=this.state,now=Date.now(),D=864e5,L=s.leads||[],C=s.clients||[];
+ let range="30";try{range=localStorage.getItem("ck_range")||"30"}catch(e){}
+ const rl=(RANGES.find(r=>r[0]===range)||RANGES[1])[1];
+ const since=range==="all"?0:now-(+range)*D;
  const mrr=C.reduce((a,c)=>a+(+c.mrr||0),0);
- const openStages=["sales_ready","letter_sent","engaged","in_conversation","offer_sent","negotiation"];
  const allOffers=[...L.flatMap(l=>(l.offers||[]).map(o=>({o,n:l.name,id:l.id,pl:"acq"}))),...C.flatMap(c=>(c.offers||[]).map(o=>({o,n:c.name,id:c.id,pl:"cli"})))];
  const openOff=allOffers.filter(x=>!["angenommen","abgelehnt","zurückgezogen"].includes(x.o.status||"offen"));
  const pipe=openOff.reduce((a,x)=>a+offerOnce(x.o),0);
  const viewed=openOff.filter(x=>x.o.viewedAt).length;
- const won30=allOffers.filter(x=>x.o.status==="angenommen"&&x.o.acceptedAt>now-30*D);
- const wonVal=won30.reduce((a,x)=>a+offerOnce(x.o),0);
- const ready=L.filter(l=>openStages.includes(l.stage)).length;
+ const won=allOffers.filter(x=>x.o.status==="angenommen"&&(x.o.acceptedAt||0)>=since);
+ const wonVal=won.reduce((a,x)=>a+offerOnce(x.o),0);
+ const newLeads=L.filter(l=>l.createdAt&&l.createdAt>=since).length;
+ const evR=(s.events||[]).filter(e=>e.ts>=since);
+ const top=`<div class="ck-top"><b>Überblick · ${rl}</b><div class="ck-rng" role="group" aria-label="Zeitraum">${RANGES.map(([v,l])=>`<button type="button" class="${v===range?"on":""}" aria-pressed="${v===range}" onclick="App.setCkRange('${v}')">${l}</button>`).join("")}</div></div>`;
  const band=`<div class="ck-band">
   <div><div class="l">Monatlich (MRR)</div><div class="v">${EUR(mrr)}</div><div class="s">${C.filter(c=>+c.mrr>0).length} Kunden in Betreuung · ${EUR(mrr*12)} im Jahr</div></div>
   <div><div class="l">Angebote offen</div><div class="v">${EUR(pipe)}</div><div class="s">${openOff.length} Angebot${openOff.length===1?"":"e"} · ${viewed} geöffnet</div></div>
-  <div><div class="l">Gewonnen · 30 Tage</div><div class="v">${EUR(wonVal)}</div><div class="s">${won30.length} Abschluss${won30.length===1?"":"e"}</div></div>
-  <div><div class="l">Heiße Leads</div><div class="v">${L.filter(l=>["engaged","in_conversation","offer_sent","negotiation"].includes(l.stage)).length}</div><div class="s">${ready} verkaufsbereit oder im Gespräch</div></div>
-  <div><div class="l">Kunden</div><div class="v">${C.length}</div><div class="s">${C.filter(c=>c.phase==="at_risk").length} mit Risiko · ${L.length} Leads im System</div></div></div>`;
- // Trichter
+  <div><div class="l">Gewonnen · ${rl}</div><div class="v">${EUR(wonVal)}</div><div class="s">${won.length} Abschluss${won.length===1?"":"e"}</div></div>
+  <div><div class="l">Neue Leads · ${rl}</div><div class="v">${newLeads}</div><div class="s">${L.filter(l=>["engaged","in_conversation","offer_sent","negotiation"].includes(l.stage)).length} heiß · ${L.filter(l=>l.stage!=="disqualified").length} aktiv</div></div>
+  <div><div class="l">Aktivität · ${rl}</div><div class="v">${evR.length}</div><div class="s">${C.length} Kunden · ${C.filter(c=>c.phase==="at_risk").length} mit Risiko</div></div></div>`;
  const grp=[["Gefunden",["discovered","researching","twin_ready"]],["Demo gebaut",["build_queue","build_running","qa","review_needed","blocked","sales_ready"]],["Kontakt",["letter_sent","engaged","in_conversation"]],["Angebot",["offer_sent","negotiation"]]];
  const cnt=grp.map(([n,st])=>[n,L.filter(l=>st.includes(l.stage)).length]);cnt.push(["Kunde",C.length]);
  const mx=Math.max(1,...cnt.map(x=>x[1]));
- const fun=`<div class="ck-card"><h4>Vertriebstrichter<span>${L.length+C.length} gesamt</span></h4><div class="fun">${cnt.map(([n,v])=>`<div class="r"><span>${n}</span><div class="b" style="width:${Math.max(1,Math.round(Math.sqrt(v/mx)*100))}%"></div><span class="n">${v}</span></div>`).join("")}</div></div>`;
- // Aktivität 14 Tage
- const days=[...Array(14)].map((_,i)=>{const d0=new Date(now-(13-i)*D);d0.setHours(0,0,0,0);return d0.getTime();});
- const ev=days.map(t=>(s.events||[]).filter(e=>e.ts>=t&&e.ts<t+D).length);const emx=Math.max(1,...ev);
- const act=`<div class="ck-card"><h4>Aktivität · 14 Tage<span>${ev.reduce((a,b)=>a+b,0)} Ereignisse</span></h4><div class="act">${ev.map((v,i)=>`<div title="${new Date(days[i]).toLocaleDateString("de-DE")}: ${v}"><i style="height:${Math.max(3,Math.round(v/emx*100))}%"></i><span>${new Date(days[i]).getDate()}</span></div>`).join("")}</div></div>`;
- // Angebots-Donut
- const cats=[["Entwurf","#D9CFBC",x=>(x.o.status||"offen")==="offen"&&!x.o.viewedAt],["Gesendet","#C99A45",x=>x.o.status==="gesendet"&&!x.o.viewedAt],["Geöffnet","#8A6322",x=>!["angenommen","abgelehnt","zurückgezogen"].includes(x.o.status)&&x.o.viewedAt],["Angenommen","#2F7A4A",x=>x.o.status==="angenommen"],["Abgesagt","#B84A3A",x=>["abgelehnt","zurückgezogen"].includes(x.o.status)]].map(([n,c,f])=>[n,c,allOffers.filter(f).length]);
+ const fun=`<div class="ck-card"><h4>Vertriebstrichter · aktuell<span>${L.filter(l=>l.stage!=="disqualified").length+C.length} aktiv</span></h4><div class="fun">${cnt.map(([n,v])=>`<div class="r"><span>${n}</span><div class="b" style="width:${Math.max(1,Math.round(Math.sqrt(v/mx)*100))}%"></div><span class="n">${v}</span></div>`).join("")}</div></div>`;
+ const firstTs=Math.min(now,...(s.events||[]).map(e=>e.ts||now));
+ const bk=buckets(range,now,D,firstTs);
+ const ev=bk.map(b=>(s.events||[]).filter(e=>e.ts>=b.a&&e.ts<b.b).length);const emx=Math.max(1,...ev);
+ const every=bk.length>16?Math.ceil(bk.length/10):1;
+ const act=`<div class="ck-card"><h4>Aktivität · ${rl}<span>${ev.reduce((a,b)=>a+b,0)} Ereignisse</span></h4><div class="act">${ev.map((v,i)=>`<div title="${bk[i].t}: ${v}"><i style="height:${Math.max(3,Math.round(v/emx*100))}%"></i><span>${(i%every===0||i===bk.length-1)?bk[i].l:"&nbsp;"}</span></div>`).join("")}</div></div>`;
+ const offR=range==="all"?allOffers:allOffers.filter(x=>(x.o.createdAt||0)>=since);
+ const cats=[["Entwurf","#D9CFBC",x=>(x.o.status||"offen")==="offen"&&!x.o.viewedAt],["Gesendet","#C99A45",x=>x.o.status==="gesendet"&&!x.o.viewedAt],["Geöffnet","#8A6322",x=>!["angenommen","abgelehnt","zurückgezogen"].includes(x.o.status)&&x.o.viewedAt],["Angenommen","#2F7A4A",x=>x.o.status==="angenommen"],["Abgesagt","#B84A3A",x=>["abgelehnt","zurückgezogen"].includes(x.o.status)]].map(([n,c,f])=>[n,c,offR.filter(f).length]);
  const tot=Math.max(1,cats.reduce((a,c)=>a+c[2],0));let acc=0;const R=40,CI=2*Math.PI*R;
  const segs=cats.filter(c=>c[2]).map(([n,c,v])=>{const len=v/tot*CI;const sg=`<circle cx="55" cy="55" r="${R}" fill="none" stroke="${c}" stroke-width="16" stroke-dasharray="${len.toFixed(2)} ${(CI-len).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}" transform="rotate(-90 55 55)"/>`;acc+=len;return sg;}).join("");
- const don=`<div class="ck-card"><h4>Angebote<span>${allOffers.length} insgesamt</span></h4><div class="donut"><svg viewBox="0 0 110 110" role="img" aria-label="Angebotsstatus"><circle cx="55" cy="55" r="${R}" fill="none" stroke="#F0EBE1" stroke-width="16"/>${segs}<text x="55" y="52" text-anchor="middle" style="font:500 24px Georgia,serif;fill:#1A1206">${allOffers.length}</text><text x="55" y="68" text-anchor="middle" style="font:600 8px system-ui;fill:#8A7A5C;letter-spacing:.1em">ANGEBOTE</text></svg><div class="leg">${cats.map(([n,c,v])=>`<span><i style="background:${c}"></i>${n} · <b>${v}</b></span>`).join("")}</div></div></div>`;
- // Kunden-Gesundheit
+ const don=`<div class="ck-card"><h4>Angebote · ${rl}<span>${offR.length} erstellt</span></h4><div class="donut"><svg viewBox="0 0 110 110" role="img" aria-label="Angebotsstatus"><circle cx="55" cy="55" r="${R}" fill="none" stroke="#F0EBE1" stroke-width="16"/>${segs}<text x="55" y="52" text-anchor="middle" style="font:500 24px Georgia,serif;fill:#1A1206">${offR.length}</text><text x="55" y="68" text-anchor="middle" style="font:600 8px system-ui;fill:#8A7A5C;letter-spacing:.1em">ANGEBOTE</text></svg><div class="leg">${cats.map(([n,c,v])=>`<span><i style="background:${c}"></i>${n} · <b>${v}</b></span>`).join("")}</div></div></div>`;
+ const GROUPS=["Manuell · Lukas","Automatik · 1. Welle","Demo fertig","A · Website veraltet","A · Website kaputt","B · Website mit Mängeln","C · ohne Website, Telefon","D · ohne Website, ohne Kontakt"];
+ const col=t=>/^Manuell/.test(t)?"#0E0A06":/^Automatik/.test(t)?"#C99A45":/^Demo/.test(t)?"#2F7A4A":/^A /.test(t)?"#8A6322":/^B /.test(t)?"#B8A27A":"#D9CFBC";
+ const seg=GROUPS.map(t=>[t,L.filter(l=>(l.tags||[]).includes(t)&&l.stage!=="disqualified").length]).filter(x=>x[1]);
+ const segHtml=seg.length?`<div class="ck-card"><h4>Lead-Gruppen<span>${L.filter(l=>l.stage==="disqualified").length} aussortiert</span></h4><div class="leg" style="gap:8px">${seg.map(([t,v])=>`<span style="cursor:pointer" onclick="App.ckGroup('${t}')"><i style="background:${col(t)}"></i>${E(t)} · <b>${v}</b></span>`).join("")}</div></div>`:"";
  const gc={A:"#2F7A4A",B:"#5b9e2f",C:"#C99A45",D:"#B8662A",F:"#B84A3A"};
- const hl=`<div class="ck-card" style="grid-column:span 1"><h4>Kunden-Gesundheit<span>${C.filter(c=>c.wpHealth).length} überwacht</span></h4><div class="hl2">${C.length?C.map(c=>{const g=c.wpHealth&&c.wpHealth.grade;return `<div class="r" onclick="App.openDetail('cli','${c.id}')"><span class="g" style="background:${gc[g]||"#C5BBA8"}">${g||"?"}</span><b>${E(c.name)}</b><small>${c.wpHealth&&c.wpHealth.ms!=null?c.wpHealth.ms+" ms":"ungeprüft"}${+c.mrr?" · "+EUR(c.mrr):""}</small></div>`;}).join(""):'<div style="font-size:12px;color:#9C8F78">Noch keine Kunden.</div>'}</div></div>`;
- return `<div class="ck">${band}<div class="ck-grid">${fun}${act}${don}</div><div class="ck-grid" style="grid-template-columns:1fr">${hl}</div></div>`;
+ const hl=`<div class="ck-card"><h4>Kunden-Gesundheit<span>${C.filter(c=>c.wpHealth).length} überwacht</span></h4><div class="hl2">${C.length?C.map(c=>{const g=c.wpHealth&&c.wpHealth.grade;return `<div class="r" onclick="App.openDetail('cli','${c.id}')"><span class="g" style="background:${gc[g]||"#C5BBA8"}">${g||"?"}</span><b>${E(c.name)}</b><small>${c.wpHealth&&c.wpHealth.ms!=null?c.wpHealth.ms+" ms":"ungeprüft"}${+c.mrr?" · "+EUR(c.mrr):""}</small></div>`;}).join(""):'<div style="font-size:12px;color:#9C8F78">Noch keine Kunden.</div>'}</div></div>`;
+ return `<div class="ck">${top}${band}<div class="ck-grid">${fun}${act}${don}</div><div class="ck-grid" style="grid-template-columns:${segHtml?"1fr 1fr":"1fr"}">${segHtml}${hl}</div></div>`;
 };
+// Klick auf eine Lead-Gruppe: Akquise-Ansicht mit diesem Tag gefiltert öffnen
+App.ckGroup=function(t){try{this.show("akquise");if(this.setFlt)this.setFlt("akquise","tag",t);}catch(e){console.warn(e);}};
 })();
 </script>
 </body>
