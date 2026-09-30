@@ -3600,6 +3600,8 @@ App.ckGroup=function(t){try{this.show("akquise");if(this.setFlt)this.setFlt("akq
 <script>
 (function(){
 const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+App.markLetter=async function(id,token){if(!confirm("Brief als versendet markieren? Nachfass-Aufgabe in 10 Tagen wird angelegt."))return;
+ try{const r=await fetch(App.apiBase()+"/api/client/offer-letter",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId:id,token})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||r.status);await App.reloadCloudState();if(App.detail)App.renderDrawer();App.toast("✓ Brief versendet, Nachfassen in 10 Tagen");}catch(e){App.toast("Fehler: "+e.message);}};
 App.leadIntel=function(item,pl){
  if(pl!=="acq")return "";
  const wc=item.websiteCheck,a=item.address,tags=item.tags||[];
@@ -3613,13 +3615,14 @@ App.leadIntel=function(item,pl){
  const steps=[
   ["Entwurf",hasDemo?`<a class="done" href="${E(item.demoUrl)}" target="_blank" rel="noopener">✓ Entwurf<small>ansehen</small></a>`:`<button class="next" onclick="App.runFactory('${item.id}')">Factory starten<small>ca. 20 Min., ~1–3 €</small></button>`],
   ["Angebot",off?`<button class="done" onclick="OStudio.open0('acq','${item.id}','${E(off.token)}')">✓ Angebot<small>${E(off.nr||"öffnen")}</small></button>`:`<button class="${hasDemo?"next":""}" onclick="OStudio.open0('acq','${item.id}')">Angebot<small>aus Vorlage</small></button>`],
-  ["Brief",off?`<a class="${off.sentAt||off.viaQr?"done":"next"}" href="${base}/api/offer/${E(off.token)}/brief" target="_blank" rel="noopener">Brief<small>drucken</small></a>`:`<button disabled>Brief<small>nach Angebot</small></button>`],
+  ["Brief",off?(off.letterSentAt?`<button class="done" onclick="window.open('${base}/api/offer/${E(off.token)}/brief','_blank')">✓ Brief<small>${new Date(off.letterSentAt).toLocaleDateString("de-DE")}${off.letters>1?" · "+off.letters+"×":""}</small></button>`:`<a class="next" href="${base}/api/offer/${E(off.token)}/brief" target="_blank" rel="noopener">Brief<small>drucken</small></a>`):`<button disabled>Brief<small>nach Angebot</small></button>`],
   ["Signal",off?`<button class="${off.viewedAt?"done":""}" onclick="OStudio.open0('acq','${item.id}','${E(off.token)}')">${off.viewedAt?"👀 geöffnet":"wartet"}<small>${off.viaQr?off.viaQr+"× per Brief":(off.views?off.views+"× angesehen":"noch nicht")}</small></button>`:`<button disabled>Signal<small>—</small></button>`]
  ];
  return `<div class="li-box"><h5><span>🔎 Steckbrief</span>${auto?'<span style="color:#9C6F2E">Automatik-Akquise</span>':""}</h5>
  ${wc?`<div class="li-need"><div class="li-score" style="background:${col}" title="Handlungsbedarf der Website (0 bis 10)">${n}</div><div><div style="font-size:12px;font-weight:700">${n>=5?"Website dringend erneuerungsbedürftig":n>=3?"Website mit deutlichen Mängeln":n>=1?"kleinere Mängel":"Website in Ordnung"}</div>${why.length?`<ul class="li-why">${why.map(w=>`<li>${E(w)}</li>`).join("")}</ul>`:""}</div></div>`:""}
  <div class="li-row">${item.contactName?`<span>👤 <b>${E(item.contactName)}</b></span>`:""}${a&&a.street?`<span>📮 ${E(a.street)}, ${E(a.plz||"")} ${E(a.ort||"")}</span>`:""}${item.phone?`<a href="tel:${E(String(item.phone).replace(/[^\d+]/g,""))}">📞 ${E(item.phone)}</a>`:""}${item.email?`<a href="mailto:${E(item.email)}">✉ ${E(item.email)}</a>`:""}${item.website?`<a href="${E(/^https?:/.test(item.website)?item.website:"http://"+item.website)}" target="_blank" rel="noopener">🌐 alte Website</a>`:""}</div>
  ${(auto||hasDemo||off)?`<div class="li-steps">${steps.map(s=>s[1]).join("")}</div>`:""}
+ ${off&&!off.letterSentAt?`<div style="margin-top:8px;font-size:11.5px;color:#6b604c">Brief gedruckt und eingeworfen? <a href="#" style="color:#9C6F2E;font-weight:700" onclick="event.preventDefault();App.markLetter('${item.id}','${E(off.token)}')">Als versendet markieren</a></div>`:""}
  </div>`;
 };
 })();
