@@ -422,7 +422,8 @@ initKeys(){
   else if(e.key==="Escape"&&onBoard){this._fltFocus=null;if(typing&&e.target.blur)e.target.blur();this.clearFlt(this.view);}
  });
 },
-persist(){clearTimeout(this.saveT);this.saveT=setTimeout(async()=>{try{localStorage.setItem("ww:state",JSON.stringify(this.state))}catch(e){}
+normalize(){/* Schutz: Listenfelder sind immer Listen. Ein falsch gespeichertes Feld (z. B. Notiz als Text) legt sonst die Ansicht lahm. */const S=this.state;if(!S)return;const fix=x=>{if(!x||typeof x!=="object")return;["notes","tasks","tags","offers"].forEach(k=>{const v=x[k];if(v==null)return;if(Array.isArray(v))return;if(typeof v==="string"){x[k]=k==="tags"?v.split(",").map(t=>t.trim()).filter(Boolean):(k==="notes"?[{id:Math.random().toString(36).slice(2,9),ts:Date.now(),text:String(v).split("[object Object]").join("").trim()}]:[]);}else x[k]=[];});};(S.leads||[]).forEach(fix);(S.clients||[]).forEach(fix);},
+persist(){this.normalize();clearTimeout(this.saveT);this.saveT=setTimeout(async()=>{try{localStorage.setItem("ww:state",JSON.stringify(this.state))}catch(e){}
  // Bevorzugt das Backend (Service-Key liegt serverseitig → immer schreibberechtigt, kein CORS-Problem).
  // Direkte Supabase nur als Fallback, falls (noch) nicht aus der Cloud geladen.
  if(this.cloudOk)await this.apiSave();
@@ -1543,7 +1544,7 @@ closeDetail(){this.detail=null;this.renderDrawer();},
 _find(pl,id){return (pl==="acq"?this.state.leads:this.state.clients).find(x=>x.id===id);},
 addTag(pl,id,tag){tag=(tag||"").trim().replace(/["'<>]/g,"").slice(0,24);if(!tag)return;const it=this._find(pl,id);if(!it)return;it.tags=it.tags||[];if(!it.tags.includes(tag))it.tags.push(tag);this.persist();this.renderAll();if(this.detail)this.renderDrawer();},
 removeTag(pl,id,tag){const it=this._find(pl,id);if(!it)return;it.tags=(it.tags||[]).filter(t=>t!==tag);this.persist();this.renderAll();if(this.detail)this.renderDrawer();},
-addNote(pl,id,text){text=(text||"").trim();if(!text)return;const it=this._find(pl,id);if(!it)return;it.notes=it.notes||[];it.notes.unshift({ts:Date.now(),text:text.slice(0,1000)});this.persist();this.renderDrawer();this.toast("Notiz gespeichert");},
+addNote(pl,id,text){text=(text||"").trim();if(!text)return;const it=this._find(pl,id);if(!it)return;it.notes=Array.isArray(it.notes)?it.notes:[];it.notes.unshift({ts:Date.now(),text:text.slice(0,1000)});this.persist();this.renderDrawer();this.toast("Notiz gespeichert");},
 addTask(pl,id,text,due){text=(text||"").trim();if(!text)return;const it=this._find(pl,id);if(!it)return;it.tasks=it.tasks||[];it.tasks.push({id:uid(),text:text.slice(0,200),due:due||today(),done:false,ts:Date.now()});this.persist();this.renderAll();if(this.detail)this.renderDrawer();this.toast("Aufgabe hinzugefügt");},
 setField(pl,id,field,val){const it=this._find(pl,id);if(!it)return;val=(val==null?"":String(val)).trim();const allow=["name","branche","ort","phone","website","paket","demoUrl","liveUrl"];if(allow.indexOf(field)<0)return;it[field]=val;this.persist();this.renderAll();if(this.detail)this.renderDrawer();this.toast("Gespeichert ✓");},
 convertItem(pl,id){const it=this._find(pl,id);if(!it)return;
@@ -1739,7 +1740,7 @@ renderDrawer(){
    <div>
     <div class="stit">Notizen</div>
     <div class="note-add"><textarea id="note-in-${id}" rows="2" placeholder="Notiz, Gesprächsnotiz, To-do …"></textarea><button class="btn bp" onclick="App.addNote('${pl}','${id}',document.getElementById('note-in-${id}').value)">+ Notiz</button></div>
-    <div class="notes">${(item.notes||[]).slice().sort((a,b)=>b.ts-a.ts).map(n=>`<div class="note"><div class="note-t">${new Date(n.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div><div class="note-x">${esc(n.text)}</div></div>`).join("")||'<div style="font-size:12px;color:#9AA4AC">Noch keine Notizen.</div>'}</div>
+    <div class="notes">${(Array.isArray(item.notes)?item.notes:[]).slice().sort((a,b)=>b.ts-a.ts).map(n=>`<div class="note"><div class="note-t">${new Date(n.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div><div class="note-x">${esc(n.text)}</div></div>`).join("")||'<div style="font-size:12px;color:#9AA4AC">Noch keine Notizen.</div>'}</div>
    </div>
    <!-- ── Aufgaben & Erinnerungen ──────────────────────── -->
    <div>
