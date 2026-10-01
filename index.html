@@ -3599,25 +3599,37 @@ LsAuth.start();
 const E=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EUR=n=>(Math.round((+n||0)*100)/100).toLocaleString("de-DE",{maximumFractionDigits:2})+" €";
 const rid=()=>Math.random().toString(36).slice(2,9);
-const CARE=[{name:"Care Basis",price:79,features:"Hosting, Domain & SSL\nÜberwachung rund um die Uhr\n1 kleine Änderung pro Monat\nMonatlicher Gesundheits-Bericht"},
- {name:"Care Plus",price:149,def:true,features:"Alles aus Care Basis\n3 Änderungen pro Monat\nSicherheits- und SEO-Check\nBevorzugter Support"},
- {name:"Care Premium",price:249,features:"Alles aus Care Plus\nKleine Änderungen ohne Limit\nMonatliches Strategie-Gespräch\nGoogle-Profil-Pflege inklusive"}];
-const OPTS=[{name:"Zusätzliche Unterseite",desc:"Eigene Seite mit Text, Bildern und Kontaktweg",price:190},
- {name:"Google-Unternehmensprofil einrichten",desc:"Fotos, Zeiten, Leistungen, Verknüpfung mit der Website",price:149},
- {name:"Online-Terminanfrage",desc:"Formular mit Wunschtermin, landet direkt bei Ihnen",price:290},
- {name:"Zweite Sprache (Englisch)",desc:"Alle Seiten übersetzt und gepflegt",price:390},
- {name:"SEO-Pflege",desc:"Laufende Optimierung und Ranking-Bericht",price:49,monthly:true}];
-const PRESETS={
- start:{label:"Website Start",o:{title:"Ihre neue Website",items:[{name:"Website mit bis zu 5 Seiten",desc:"Individuelles Design, fürs Handy optimiert, schnell und barrierearm",amount:1490},{name:"Inhalte selbst pflegen im Kunden-Portal",desc:"Zeiten, Hinweise und Texte ohne Technikwissen ändern",amount:0},{name:"Domain, Hosting und SSL im ersten Jahr",amount:0},{name:"Impressum und Datenschutz als Vorlage",amount:0}],options:OPTS.slice(0,3),carePlans:CARE,timeline:"Live in 2 bis 3 Wochen nach Ihrer Freigabe",payment:"50 % bei Auftrag, 50 % bei Livegang"}},
- premium:{label:"Website Premium",o:{title:"Ihre neue Website",items:[{name:"Website mit bis zu 10 Seiten",desc:"Mehrseitig vernetzt, mit Wegführung von der Startseite zu jedem Anliegen",amount:2990},{name:"Bewegtes Titelbild und Detail-Animationen",desc:"Film im Kopfbereich, ruhige Übergänge",amount:0},{name:"Lokale Suchmaschinen-Grundlage",desc:"Seitentitel, Beschreibungen, strukturierte Daten, Google-Anbindung",amount:0},{name:"Inhalte selbst pflegen im Kunden-Portal",amount:0},{name:"Domain, Hosting und SSL im ersten Jahr",amount:0}],options:OPTS,carePlans:CARE,timeline:"Live in 3 bis 4 Wochen nach Ihrer Freigabe",payment:"50 % bei Auftrag, 50 % bei Livegang"}},
- signature:{label:"Signature",o:{title:"Ihr Signature-Auftritt",items:[{name:"Signature-Website",desc:"Eigene Bildwelt, Film, 3D oder Rundgang, bis zu 15 Seiten",amount:5900},{name:"Eigene Fotos und Filme per KI-Produktion",desc:"Passend zu Ihrem Betrieb, rechtssicher lizenziert",amount:0},{name:"Konzept-Workshop",desc:"90 Minuten, Zielgruppen und Wege auf der Seite",amount:0},{name:"Domain, Hosting und SSL im ersten Jahr",amount:0}],options:OPTS,carePlans:CARE.slice(1),timeline:"Live in 5 bis 6 Wochen",payment:"40 % bei Auftrag, 30 % bei Entwurf, 30 % bei Livegang"}},
+// Pakete, Care und Zusatzleistungen kommen aus dem Katalog der API (/api/catalog, Quelle catalog.js).
+// Bis er geladen ist, gilt diese eingebaute Kopie (Stand 2.10.2026).
+const CARE=[{name:"Care Start",price:49,features:"Hosting, Domain und Verschlüsselung\nÜberwachung rund um die Uhr, tägliche Sicherung\nZeiten, Urlaub und Hinweise selbst im Portal\n1 kleine Änderung pro Monat durch uns"},
+ {name:"Care Basis",price:79,def:true,features:"Alles aus Care Start\nBis zu 3 Änderungen pro Monat\nGoogle-Unternehmensprofil aktuell gehalten\nMonatsbericht: Besucher, Anfragen, Tempo\nAntwort am nächsten Werktag"},
+ {name:"Care Plus",price:149,features:"Alles aus Care Basis\nKleine Änderungen ohne Begrenzung\nJeden Monat etwas Neues von uns\nGoogle-Profil mit Beiträgen und Bewertungs-Antworten\nQuartals-Check mit Umsetzung, jährlich neuer Film\nAntwort am selben Werktag"}];
+const OPTS=[{name:"Zusätzliche Seite",desc:"Eine weitere Seite im Design Ihrer Website, Text inklusive",price:120},
+ {name:"Google-Unternehmensprofil einrichten",desc:"Profil vollständig, mit Fotos, Leistungen und Verknüpfung zur Website",price:149},
+ {name:"Online-Terminanfrage",desc:"Anfragen landen direkt in Ihrem Portal, mit Bestätigungsmail",price:240},
+ {name:"Zweite Sprache",desc:"Ihre Website zusätzlich auf Englisch, mit Sprachumschalter",price:390},
+ {name:"Google-Profil-Pflege",desc:"Zeiten, Fotos und ein Beitrag im Monat",price:39,monthly:true}];
+const PK={kompakt:750,komplett:1800,individuell:1500};
+const PRESETS={};
+function buildPresets(){
+ Object.assign(PRESETS,{
+ kompakt:{label:"Kompakt",o:{title:"Ihre neue Website",items:[{name:"Website Kompakt, 3 bis 4 Seiten",desc:"Eigenes Design mit Film oder bewegtem Bild, eigene Bilder, Übergänge, fürs Handy gemacht",amount:PK.kompakt},{name:"Kontaktformular, Anruf und Route mit einem Tipp",amount:0},{name:"Inhalte selbst pflegen im Kunden-Portal",desc:"Zeiten, Hinweise und Texte ohne Technikwissen ändern",amount:0},{name:"Impressum und Datenschutz",amount:0}],options:OPTS.slice(0,4),carePlans:CARE,timeline:"Live etwa eine Woche nach Ihrer Freigabe",payment:"50 % bei Auftrag, 50 % bei Livegang"}},
+ komplett:{label:"Komplett",o:{title:"Ihre neue Website",items:[{name:"Website Komplett, 6 bis 10 Seiten",desc:"Eigener Aufbau je Seite, Wegführung von der Startseite zu jedem Anliegen",amount:PK.komplett},{name:"Filme, Übergänge und Effekte auf jeder Seite",amount:0},{name:"Texte von uns",desc:"Aus einem Gespräch mit Ihnen",amount:0},{name:"Eine Funktion nach Wahl",desc:"Speisekarte, Terminanfrage, Galerie mit Filter oder Stellenangebote",amount:0},{name:"Google-Grundeinrichtung und lokales SEO",amount:0},{name:"Inhalte selbst pflegen im Kunden-Portal",amount:0}],options:OPTS,carePlans:CARE,timeline:"Live etwa zwei Wochen nach Ihrer Freigabe",payment:"50 % bei Auftrag, 50 % bei Livegang"}},
+ individuell:{label:"Individuell",o:{title:"Ihr individuelles Projekt",items:[{name:"Individuelle Website",desc:"Umfang, Funktionen und rechtliche Anforderungen nach unserem Gespräch",amount:PK.individuell},{name:"Eigene Fotos und Filme",desc:"Passend zu Ihrem Betrieb",amount:0},{name:"Konzept-Gespräch",desc:"Zielgruppen und Wege auf der Seite",amount:0}],options:OPTS,carePlans:CARE.slice(1),timeline:"Nach Umfang, schriftlich vereinbart",payment:"40 % bei Auftrag, 30 % bei Entwurf, 30 % bei Livegang"}},
  care:{label:"Nur Betreuung",o:{title:"Ihre Website in guten Händen",items:[{name:"Übernahme und Prüfung Ihrer bestehenden Website",desc:"Sicherheit, Tempo, Erreichbarkeit",amount:0}],carePlans:CARE}},
  leer:{label:"Leer",o:{title:"",items:[{name:"",amount:""}]}}
-};
+ });
+}
+buildPresets();
+// Katalog nachladen und die eingebaute Kopie ersetzen (Preise und Texte immer wie auf der Website)
+(async()=>{try{const r=await fetch(App.apiBase()+"/api/catalog");const d=await r.json();if(!d||!d.ok)return;
+ CARE.splice(0,CARE.length,...d.care.map(c=>({name:c.name,price:c.price,def:!!c.featured,features:c.bullets.join(String.fromCharCode(10))})));
+ OPTS.splice(0,OPTS.length,...d.addons.filter(a=>a.per!=="Jahr").map(a=>Object.assign({name:a.name,desc:a.desc,price:a.price},a.per==="Monat"?{monthly:true}:{})));
+ d.packages.forEach(p=>{if(PK[p.id]!=null)PK[p.id]=p.price;});buildPresets();}catch(e){}})();
 const OS={t:null,o:null,view:"d",prevT:null,dirty:false};
 function ag(){const a=(App.state.settings&&App.state.settings.agency)||{};return{name:a.owner||"Lukas Ackermann",role:"Gründer",phone:a.phone||"",email:a.email||"lukas@orendastudios.de"};}
 function subj(){const t=OS.t;return (t.pl==="acq"?App.state.leads:App.state.clients).find(x=>x.id===t.id)||{};}
-function fresh(key){const p=JSON.parse(JSON.stringify(PRESETS[key||"start"].o));const s=subj();
+function fresh(key){const p=JSON.parse(JSON.stringify((PRESETS[key]||PRESETS.kompakt).o));const s=subj();
  const g=new Date(Date.now()+30*864e5);
  return Object.assign({title:"",anrede:"",intro:"",items:[],variants:s.demoUrl?[{name:"Ihr Entwurf",url:s.demoUrl,desc:"",tag:"",image:"",price:0}]:[],options:[],carePlans:[],careOptional:false,discount:{label:"",amount:0,pct:0},payment:"",timeline:"",gueltigBis:g.toISOString().slice(0,10),contact:ag(),mailSubject:"",mailMessage:""},p,{title:(p.title||"Ihr Angebot")+(s.name?" · "+s.name:"")});}
 function norm(o){o=JSON.parse(JSON.stringify(o||{}));["items","variants","options","carePlans"].forEach(k=>o[k]=Array.isArray(o[k])?o[k]:[]);
@@ -3694,7 +3706,7 @@ async function preview(){const seq=OS.seq=(OS.seq||0)+1;const st=document.getEle
   if(st)st.textContent=r.ok?"":"Vorschau-Fehler "+r.status;}catch(e){if(st)st.textContent="offline";}}
 window.OStudio={
  open0(pl,id,token){OS.t={pl,id};OS.token=token||null;OS.dirty=false;const s=subj();const off=token?(s.offers||[]).find(x=>x.token===token):null;
-  OS.o=off?norm(off):fresh("start");if(off&&!OS.o.contact.name)OS.o.contact=ag();document.getElementById("OS").classList.add("on");document.body.style.overflow="hidden";render();},
+  OS.o=off?norm(off):fresh("komplett");if(off&&!OS.o.contact.name)OS.o.contact=ag();document.getElementById("OS").classList.add("on");document.body.style.overflow="hidden";render();},
  dup(pl,id,token){this.open0(pl,id,token);OS.token=null;OS.o.title=OS.o.title;OS.dirty=true;render();App.toast("Kopie: Änderungen anpassen, dann „Angebot anlegen“");},
  close(){if(OS.dirty&&!confirm("Ungespeicherte Änderungen verwerfen?"))return;document.getElementById("OS").classList.remove("on");document.getElementById("OS").innerHTML="";document.body.style.overflow="";},
  add(k){const d={items:{name:"",desc:"",amount:""},variants:{name:"",url:"",image:"",desc:"",tag:"",price:0},options:{name:"",desc:"",price:0,monthly:false,def:false},carePlans:{name:"",price:0,features:"",def:!OS.o.carePlans.length}}[k];OS.o[k].push(Object.assign({id:rid()},d));OS.dirty=true;render();},
