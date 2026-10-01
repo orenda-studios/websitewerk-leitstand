@@ -7,6 +7,23 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='22' fill='%23171410'/%3E%3Ccircle cx='48' cy='50' r='26' fill='none' stroke='%23f4efe6' stroke-width='4.5'/%3E%3Ccircle cx='48' cy='24' r='7' fill='%23d3a24a'/%3E%3Ccircle cx='48' cy='50' r='4' fill='%23f4efe6'/%3E%3C/svg%3E">
 <style>
 :root{--a:#E8590C;--ink:#1A2530;--bg:#EDEFF0;--border:#D8DDE0;--bs:#E4E8EA;--muted:#6B767F;--g:#2F9E44;--amb:#F08C00;--red:#E03131;--rail:212px}
+.ls-login{position:fixed;inset:0;z-index:200000;display:grid;place-items:center;padding:16px;background:var(--bg)}
+.ls-login[hidden]{display:none}
+body.ls-locked>*:not(.ls-login):not(script){visibility:hidden}
+.ls-card{width:100%;max-width:380px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:30px 28px 24px;box-shadow:0 18px 50px -24px rgba(26,37,48,.35)}
+.ls-eye{font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--a)}
+.ls-card h1{font-size:24px;margin:8px 0 4px;letter-spacing:-.01em}
+.ls-sub{color:var(--muted);margin-bottom:18px;line-height:1.5}
+.ls-card label{display:block;font-size:12px;font-weight:600;margin:12px 0 5px;color:var(--ink)}
+.ls-card input{width:100%;font:inherit;font-size:15px;padding:11px 12px;border:1px solid #CBD2D6;border-radius:8px;background:#fff;color:var(--ink)}
+.ls-card input:focus{outline:2px solid var(--a);outline-offset:1px;border-color:var(--a)}
+.ls-code{font-family:ui-monospace,Menlo,Consolas,monospace!important;font-size:24px!important;letter-spacing:.35em;text-align:center}
+.ls-btn{display:block;width:100%;margin-top:12px;padding:12px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer}
+.ls-btn:disabled{opacity:.55;cursor:default}
+.ls-btn:active{transform:translateY(1px)}
+.ls-link{display:block;margin:10px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:13px system-ui,sans-serif}
+.ls-msg{min-height:20px;margin-top:14px;font-size:13px;color:var(--muted);line-height:1.5}
+.ls-msg.bad{color:var(--red)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;overflow:hidden;height:100vh}
 #app{display:flex;height:100vh}
@@ -334,6 +351,27 @@ nav a.active{box-shadow:0 4px 12px rgba(26,37,48,.28)}
   </main>
 </div>
 <div id="MR"></div><div id="DR"></div><div id="FR"></div>
+<div id="ls-login" class="ls-login" hidden role="dialog" aria-modal="true" aria-labelledby="ls-h">
+ <div class="ls-card">
+  <div class="ls-eye">Orenda Studios · Leitstand</div>
+  <h1 id="ls-h">Anmelden</h1>
+  <p class="ls-sub">Du bekommst einen 6-stelligen Code per Mail.</p>
+  <form id="ls-form1" autocomplete="on">
+   <label for="ls-email">E-Mail</label>
+   <input id="ls-email" type="email" autocomplete="username" inputmode="email" required>
+   <button id="ls-send" class="ls-btn" type="submit">Code senden</button>
+  </form>
+  <div id="ls-step2" hidden>
+   <form id="ls-form2">
+    <label for="ls-code">Code an <span id="ls-to"></span></label>
+    <input id="ls-code" class="ls-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000">
+    <button id="ls-go" class="ls-btn" type="submit">Anmelden</button>
+    <button id="ls-again" class="ls-link" type="button">Neuen Code senden</button>
+   </form>
+  </div>
+  <p id="ls-msg" class="ls-msg" role="status" aria-live="polite"></p>
+ </div>
+</div>
 <script>
 /* === Leitstand-API-Auth (opt-in) ===
    Hängt den Header x-ww-key NUR an Requests ans Orenda Studios-Backend an,
@@ -345,8 +383,9 @@ nav a.active{box-shadow:0 4px 12px rgba(26,37,48,.28)}
   var _f=window.fetch.bind(window);
   function base(){try{var c=JSON.parse(localStorage.getItem("ww:cfg")||"{}");var u=c.apiUrl||"https://api.orendastudios.de";if(/onrender\.com|websitewerk/i.test(u))u="https://api.orendastudios.de";return u.replace(/\/$/,"");}catch(e){return "https://api.orendastudios.de";}}
   window.fetch=function(input,init){
+    var url="";
     try{
-      var url=typeof input==="string"?input:(input&&input.url)||"";
+      url=typeof input==="string"?input:(input&&input.url)||"";
       var key=localStorage.getItem("ww_api_key");
       if(key&&url.indexOf(base())===0){
         init=Object.assign({},init);
@@ -354,8 +393,68 @@ nav a.active{box-shadow:0 4px 12px rgba(26,37,48,.28)}
         h.set("x-ww-key",key); init.headers=h;
       }
     }catch(e){}
-    return _f(input,init);
+    // Sitzung abgelaufen oder abgemeldet: Anmeldung zeigen statt stiller Fehler.
+    return _f(input,init).then(function(r){
+      try{if(r.status===401&&url.indexOf(base())===0&&url.indexOf("/api/auth/")<0&&window.LsAuth)window.LsAuth.show("Bitte neu anmelden.");}catch(e){}
+      return r;
+    });
   };
+  window.__lsBase=base;window.__lsFetch=_f;
+})();
+/* === Anmeldung per E-Mail-Code (seit API v10.111) ===
+   Nur freigegebene Adressen bekommen einen Code. Das Sitzungs-Token liegt in localStorage
+   'ww_api_key' und geht über den Wrapper oben als x-ww-key mit. */
+window.LsAuth=(function(){
+  var started=false,shown=false;
+  function payload(t){try{return JSON.parse(atob(String(t).split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));}catch(e){return null;}}
+  function api(p,body){return window.__lsFetch(window.__lsBase()+p,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{headers:{"x-ww-key":localStorage.getItem("ww_api_key")||""}});}
+  function el(id){return document.getElementById(id);}
+  function msg(t,bad){var m=el("ls-msg");if(m){m.textContent=t||"";m.className="ls-msg"+(bad?" bad":"");}}
+  function show(note){
+    if(shown)return;shown=true;
+    var o=el("ls-login");o.hidden=false;document.body.classList.add("ls-locked");
+    msg(note||"");var e=el("ls-email");if(!e.value)e.value=localStorage.getItem("ls_email")||"lukas@orendastudios.de";
+    setTimeout(function(){(el("ls-step2").hidden?el("ls-send"):el("ls-code")).focus();},50);
+  }
+  async function send(ev){
+    if(ev)ev.preventDefault();var e=el("ls-email").value.trim().toLowerCase();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){msg("Bitte eine gültige E-Mail eingeben.",true);return;}
+    el("ls-send").disabled=true;msg("Code wird verschickt …");
+    try{var r=await api("/api/auth/leitstand/request",{email:e});var d=await r.json().catch(function(){return{};});
+      if(!r.ok){msg(d.error||"Fehler beim Senden.",true);}
+      else{localStorage.setItem("ls_email",e);el("ls-step2").hidden=false;el("ls-to").textContent=e;msg("Code ist unterwegs. Schau in dein Postfach.");el("ls-code").value="";el("ls-code").focus();}
+    }catch(x){msg("Server nicht erreichbar. Gleich noch einmal versuchen.",true);}
+    el("ls-send").disabled=false;
+  }
+  async function verify(ev){
+    if(ev)ev.preventDefault();var c=el("ls-code").value.replace(/\D/g,"");
+    if(c.length!==6){msg("Der Code hat 6 Ziffern.",true);return;}
+    el("ls-go").disabled=true;msg("Prüfe …");
+    try{var r=await api("/api/auth/leitstand/verify",{email:el("ls-email").value.trim().toLowerCase(),code:c});var d=await r.json().catch(function(){return{};});
+      if(!r.ok||!d.token){msg(d.error||"Anmeldung fehlgeschlagen.",true);el("ls-go").disabled=false;return;}
+      localStorage.setItem("ww_api_key",d.token);msg("Angemeldet.");
+      if(started){location.reload();return;}
+      hide();boot();
+    }catch(x){msg("Server nicht erreichbar.",true);el("ls-go").disabled=false;}
+  }
+  function hide(){shown=false;el("ls-login").hidden=true;document.body.classList.remove("ls-locked");}
+  function boot(){if(started)return;started=true;App.init();}
+  async function start(){
+    el("ls-form1").addEventListener("submit",send);el("ls-form2").addEventListener("submit",verify);
+    el("ls-again").addEventListener("click",function(){el("ls-step2").hidden=true;send();});
+    el("ls-code").addEventListener("input",function(){if(this.value.replace(/\D/g,"").length===6)verify();});
+    var t=localStorage.getItem("ww_api_key")||"";var p=payload(t);
+    if(!t||t.indexOf("ls1.")!==0||!p||p.exp<Date.now()){if(t&&t.indexOf("ls1.")!==0)localStorage.removeItem("ww_api_key");show();return;}
+    try{var r=await api("/api/auth/leitstand/me");if(r.status===401){show("Sitzung abgelaufen. Bitte neu anmelden.");return;}}catch(e){/* offline: lokaler Stand */}
+    boot();
+  }
+  async function logout(all){
+    if(all){if(!confirm("Alle Geräte abmelden? Auch dieses Gerät braucht danach einen neuen Code."))return;
+      try{await api("/api/auth/leitstand/logout-all",{});}catch(e){}}
+    localStorage.removeItem("ww_api_key");location.reload();
+  }
+  function info(){var p=payload(localStorage.getItem("ww_api_key")||"");return p?{email:p.e,exp:p.exp,device:p.d}:null;}
+  return{start:start,show:show,logout:logout,info:info};
 })();
 /* === Statusmaschine === */
 const AS=[{id:"discovered",l:"Discovered"},{id:"researching",l:"Researching"},{id:"twin_ready",l:"Twin Ready"},{id:"build_queue",l:"Build Queue"},{id:"build_running",l:"Build Running"},{id:"qa",l:"QA"},{id:"review_needed",l:"Review Needed"},{id:"blocked",l:"Blocked"},{id:"sales_ready",l:"Sales Ready"},{id:"letter_sent",l:"Letter Sent"},{id:"engaged",l:"Engaged"},{id:"in_conversation",l:"In Conversation"},{id:"offer_sent",l:"Offer Sent"},{id:"negotiation",l:"Negotiation"},{id:"won",l:"Won",t:1},{id:"nurture",l:"Nurture"},{id:"lost",l:"Lost",t:1},{id:"disqualified",l:"Disqualified",t:1}];
@@ -402,6 +501,8 @@ cfg:{},saveT:null,sync:"local",cloudOk:false,syncErr:"",_recT:null,_recDelay:0,
 
 async init(){
  try{this.cfg=JSON.parse(localStorage.getItem("ww:cfg")||"{}")}catch(e){this.cfg={}}
+ // Seit 1.10.2026 ist die Datenbank für öffentliche Schlüssel gesperrt; alles läuft über das Backend.
+ if(this.cfg.sbKey){delete this.cfg.sbKey;try{localStorage.setItem("ww:cfg",JSON.stringify(this.cfg))}catch(e){}}
  let d=null;
  // Cloud ZUERST und IMMER. sbLoad faellt intern auf das Backend zurueck, das die
  // Supabase-Keys serverseitig haelt. Vorher lief das nur, wenn Supabase-Zugangsdaten
@@ -1962,6 +2063,10 @@ renderDrawer(){
     <div class="mf" style="margin-bottom:6px"><label>Service-Role-Key</label><input id="ext-key-${id}" type="password" placeholder="${item.externalDb?.serviceKey?"•••• (gesetzt — zum Ändern neu eingeben)":"eyJ..."}" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"></div>
     <div style="display:flex;gap:8px"><button class="btn bg bsm" onclick="App.saveExtDb('${id}')">Verbinden &amp; testen</button>${item.externalDb?`<button class="btn bg bsm" onclick="App.saveExtDb('${id}',true)">Trennen</button>`:""}</div>
     <div id="ext-status-${id}" style="font-size:11px;color:#5A6670;margin-top:6px">${item.externalDb?"✅ verbunden — erneut prüfen jederzeit möglich":""}</div>
+    <div class="stit" style="margin-top:16px">🩺 Praxis-Modus (Rezept, Überweisung, Rückruf)</div>
+    <div style="font-size:11px;color:#5A6670;margin-bottom:6px;line-height:1.5">Für Arztpraxen: Online-Anfragen landen verschlüsselt in einer eigenen Tabelle, nie im CRM oder in Backups. Die Praxis bekommt nur einen Hinweis ohne Inhalt und bearbeitet alles im Praxis-Postfach ihres Dashboards. Vorher AVV und Verschwiegenheitserklärung unterschreiben lassen.</div>
+    <div class="mf" style="margin-bottom:6px"><label>Hinweis-Mails an</label><input id="px-mail-${id}" placeholder="praxis@…" value="${esc(item.praxis?.notifyEmail||item.email||"")}" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"></div>
+    <div style="display:flex;gap:8px;align-items:center"><button class="btn bg bsm" onclick="App.setPraxis('${id}',${item.praxis?.on?"false":"true"})">${item.praxis?.on?"Ausschalten":"Einschalten"}</button><span style="font-size:11px;color:${item.praxis?.on?"var(--g)":"#9AA4AC"}">${item.praxis?.on?"aktiv · Formular-Ziel: /api/site/praxis/"+esc(id)+"/anfrage":"aus"}</span></div>
    </div>
    ${pl==="cli"?`<div><div class="stit" style="display:flex;justify-content:space-between;align-items:center">Projektanfragen / Sprint Desk<button class="btn bg bsm" onclick="App.show('projekte')">Alle öffnen</button></div>${this.projectMiniList(id)}</div>`:""}
    `:""}
@@ -2075,6 +2180,17 @@ async sendReport(id,send){
   await this.reloadCloudState();
   this.toast("✓ Bericht erstellt"+(d.sent?" und gemailt":"")+" · PSI "+(d.report.psiScore||"—"));
   this.renderDrawer();
+ }catch(e){this.toast("Fehler: "+e.message);}
+},
+async setPraxis(id,on){
+ const mail=((document.getElementById("px-mail-"+id)||{}).value||"").trim();
+ if(on&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){this.toast("Bitte die Praxis-Mail für Hinweise eintragen");return;}
+ if(on&&!confirm("Praxis-Modus einschalten? Vorher sollten AVV und Verschwiegenheitserklärung unterschrieben sein."))return;
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/praxis-mode",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clientId:id,on:!!on,notifyEmail:mail})});
+  const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||"Fehler");
+  if(on&&!d.encrypted)this.toast("Achtung: Verschlüsselungsschlüssel fehlt, Anfragen werden abgelehnt");else this.toast(on?"✓ Praxis-Modus aktiv":"Praxis-Modus aus");
+  await this.reloadFromCloud();if(this.detail)this.renderDrawer();
  }catch(e){this.toast("Fehler: "+e.message);}
 },
 async saveExtDb(id,remove){
@@ -2626,6 +2742,20 @@ rFinanzen(){
    <div id="fin-euer" style="font-size:13px;color:var(--muted)">Lade …</div>
   </div></div>
   <div class="panel"><div class="cfg-sec">
+   <div class="stit" style="color:var(--a);font-size:11px">📥 BELEGE HOCHLADEN — WERDEN AUTOMATISCH GELESEN</div>
+   <p class="hint" style="margin-bottom:10px">Rechnungen und Aufladungs-Belege (PDF oder Foto) hier hineinziehen. Anbieter, Datum und Betrag werden gelesen und als Ausgabe erfasst, Dollar-Beträge umgerechnet. fal-, Anthropic- und Meshy-Aufladungen landen automatisch beim Guthaben-Abgleich. Gibt es den Beleg schon, wird er nicht doppelt gebucht.</p>
+   <label id="scan-drop" style="display:block;border:1.5px dashed #CBD2D6;border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:#FAFBFB" ondragover="event.preventDefault();this.style.borderColor='var(--a)'" ondragleave="this.style.borderColor='#CBD2D6'" ondrop="event.preventDefault();this.style.borderColor='#CBD2D6';App.scanReceipts(event.dataTransfer.files)">
+    <b>Belege auswählen oder hierher ziehen</b><div style="font-size:12px;color:#9AA4AC;margin-top:3px">PDF, JPG, PNG · mehrere auf einmal</div>
+    <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" style="display:none" onchange="App.scanReceipts(this.files);this.value=''">
+   </label>
+   <div id="scan-out" style="font-size:13px;margin-top:8px"></div>
+  </div></div>
+  <div class="panel"><div class="cfg-sec">
+   <div class="stit" style="color:var(--a);font-size:11px">🗓️ MONATSABSCHLUSS — KI &amp; MEDIEN</div>
+   <p class="hint" style="margin-bottom:10px">Am Monatsanfang wird der Vormonat automatisch abgeschlossen: Verbrauch je Anbieter und je Kunde festgehalten, Mail an dich. Bei Anbietern mit Monatsrechnung legt der Abschluss die Ausgabe selbst an („Beleg fehlt“), die hochgeladene Rechnung gleicht sie dann an. Bei Guthaben-Anbietern zählt die Aufladung als Ausgabe.</p>
+   <div id="fin-close" style="font-size:13px;color:var(--muted)">Lade …</div>
+  </div></div>
+  <div class="panel"><div class="cfg-sec">
    <div class="stit" style="color:var(--a);font-size:11px">🧾 BETRIEBSAUSGABEN ERFASSEN</div>
    <p class="hint" style="margin-bottom:10px">Jede geschäftliche Ausgabe (Tools, Hosting, KI-Guthaben, Werbung …). Beleg aufheben — fürs Finanzamt.</p>
    <div class="cfg-g2">
@@ -2767,8 +2897,8 @@ _renderFinance(d){
   eur.innerHTML=rows.length?('<table style="width:100%;border-collapse:collapse"><thead><tr style="text-align:left;color:#9AA4AC;font-size:11px;text-transform:uppercase"><th style="padding:6px 4px">Jahr</th><th style="text-align:right;padding:6px 4px">Einnahmen</th><th style="text-align:right;padding:6px 4px">Ausgaben</th><th style="text-align:right;padding:6px 4px">Gewinn</th></tr></thead><tbody>'+rows.map(r=>`<tr style="border-top:1px solid #EAEEF0"><td style="padding:8px 4px;font-weight:700">${r.year}</td><td style="text-align:right;padding:8px 4px;color:var(--g)">${fmt(r.income)} €</td><td style="text-align:right;padding:8px 4px;color:var(--amb)">${fmt(r.expense)} €</td><td style="text-align:right;padding:8px 4px;font-weight:800;color:${r.profit>=0?'var(--g)':'var(--red)'}">${fmt(r.profit)} €</td></tr>`).join("")+'</tbody></table>'):'<span>Noch keine Daten — erfasse Ausgaben und markiere Rechnungen als bezahlt.</span>';
  }
  if(list){
-  const exp=(d.expenses||[]);
-  list.innerHTML='<div style="font-size:11px;text-transform:uppercase;color:#9AA4AC;margin-bottom:6px">Erfasste Ausgaben ('+exp.length+') · gesamt '+fmt(d.totalExpense||0)+' €</div>'+(exp.length?exp.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #EAEEF0"><div style="flex:none;width:82px;color:#9AA4AC;font-size:12px">${esc(e.date||"")}</div><div style="flex:1;min-width:0"><b>${fmt(e.amount)} €</b> · ${esc(e.category||"")}${e.vendor?' · '+esc(e.vendor):''}${e.recurring&&e.recurring!=='einmalig'?' <span style="background:#efe7d4;color:#8a6d2f;border-radius:4px;padding:1px 5px;font-size:10px">↻ '+esc(e.recurring)+'</span>':''}${this._allocLabel(e)}${e.receiptUrl?' · <a href="'+esc(e.receiptUrl)+'" target="_blank" rel="noopener" style="color:var(--a)">📎 Beleg</a>':''}${e.note?`<div style="font-size:12px;color:#9AA4AC">${esc(e.note)}</div>`:''}</div><button class="btn bg bsm" title="Auf Kunden aufteilen" onclick="App.editAlloc('${e.id}')" style="flex:none">% Aufteilen</button><button class="btn bg bsm" title="Löschen" onclick="App.delExpense('${e.id}')" style="flex:none">✕</button></div><div id="alloc-${e.id}"></div>`).join(""):'<div style="color:#9AA4AC">Noch keine Ausgaben erfasst.</div>');
+  const exp=(d.expenses||[]);this._finExp=exp;
+  list.innerHTML='<div style="font-size:11px;text-transform:uppercase;color:#9AA4AC;margin-bottom:6px">Erfasste Ausgaben ('+exp.length+') · gesamt '+fmt(d.totalExpense||0)+' €</div>'+(exp.length?exp.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #EAEEF0"><div style="flex:none;width:82px;color:#9AA4AC;font-size:12px">${esc(e.date||"")}</div><div style="flex:1;min-width:0"><b>${fmt(e.amount)} €</b> · ${esc(e.category||"")}${e.vendor?' · '+esc(e.vendor):''}${e.recurring&&e.recurring!=='einmalig'?' <span style="background:#efe7d4;color:#8a6d2f;border-radius:4px;padding:1px 5px;font-size:10px">↻ '+esc(e.recurring)+'</span>':''}${this._allocLabel(e)}${e.receiptUrl?' · <a href="'+esc(e.receiptUrl)+'" target="_blank" rel="noopener" style="color:var(--a)">📎 Beleg</a>':''}${e.pruefen?' <span style="background:#fff4e0;color:#a35f00;border-radius:4px;padding:1px 5px;font-size:10px">automatisch gelesen · prüfen</span>':''}${e.belegFehlt&&!e.receiptUrl?' <span style="background:#fde8e8;color:#b42318;border-radius:4px;padding:1px 5px;font-size:10px">Beleg fehlt</span>':''}${e.note?`<div style="font-size:12px;color:#9AA4AC">${esc(e.note)}</div>`:''}</div><button class="btn bg bsm" title="Datum, Betrag, Anbieter korrigieren" onclick="App.editExp('${e.id}')" style="flex:none">✎</button><button class="btn bg bsm" title="Auf Kunden aufteilen" onclick="App.editAlloc('${e.id}')" style="flex:none">% Aufteilen</button><button class="btn bg bsm" title="Löschen" onclick="App.delExpense('${e.id}')" style="flex:none">✕</button></div><div id="alloc-${e.id}"></div>`).join(""):'<div style="color:#9AA4AC">Noch keine Ausgaben erfasst.</div>');
  }
 },
 _allocSubjects(){
@@ -2850,8 +2980,63 @@ async loadFinance(){
   const r=await fetch(this.apiBase()+"/api/client/finance",{headers:{"x-ww-key":key}});
   const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
   this._renderFinance(d);
-  this.loadEconomics();
+  this.loadEconomics();this.loadClosings();
  }catch(e){if(eur)eur.textContent="Finanzdaten nicht ladbar: "+e.message;}
+},
+async scanReceipts(files){
+ const out=document.getElementById("scan-out");if(!out||!files||!files.length)return;
+ const list=[...files].slice(0,20);const f=n=>(+n||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});
+ out.innerHTML=list.map((x,i)=>`<div id="scan-${i}" style="padding:6px 0;border-top:1px solid #EAEEF0">⏳ ${esc(x.name)} wird gelesen …</div>`).join("");
+ let last=null;
+ for(let i=0;i<list.length;i++){const file=list[i],row=document.getElementById("scan-"+i);
+  try{const r=await fetch(this.apiBase()+"/api/client/expense-scan",{method:"POST",headers:{"x-filename":file.name||"beleg","Content-Type":file.type||"application/octet-stream"},body:file});
+   const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||("HTTP "+r.status));
+   if(d.expenses)last=d;const e=d.expense;
+   row.innerHTML=!d.read?`⚠️ ${esc(file.name)}: ${esc(d.msg)} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--a)">Beleg</a>`
+    :d.duplicate?`↺ ${esc(file.name)}: ${esc(d.msg)}`
+    :`✓ <b>${esc(e.vendor||"Ausgabe")}</b> · ${f(e.amount)} € · ${esc(e.date)}${d.matched?" · Monatseintrag angeglichen":""}${d.converted?" · umgerechnet":""}${e.mode==="verbrauch"?" · Guthaben "+esc(e.provider):""} <button class="btn bg bsm" onclick="App.editExp('${e.id}')">Prüfen</button>`;
+  }catch(err){row.innerHTML=`✕ ${esc(file.name)}: ${esc(err.message)}`;}
+ }
+ if(last){this._renderFinance(last);this.loadEconomics();this.loadClosings();}
+},
+async loadClosings(){
+ const box=document.getElementById("fin-close");if(!box)return;
+ const f=n=>(+n||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});
+ const mName=p=>{const[y,m]=p.split("-");return new Date(+y,+m-1,1).toLocaleDateString("de-DE",{month:"long",year:"numeric"});};
+ try{const r=await fetch(this.apiBase()+"/api/client/closings");const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  this._closeBilling=d.billing||{};const cur=new Date().toISOString().slice(0,7);
+  const bill=Object.entries(d.billing||{}).map(([p,v])=>`<label style="display:inline-flex;gap:5px;align-items:center;margin:0 12px 4px 0;font-size:12px">${esc(p)} <select data-prov="${esc(p)}" class="close-bill" style="border:1px solid #CBD2D6;border-radius:6px;padding:3px 6px;font-size:12px"><option value="guthaben"${v==="guthaben"?" selected":""}>Guthaben</option><option value="rechnung"${v==="rechnung"?" selected":""}>Monatsrechnung</option></select></label>`).join("");
+  const rows=(d.closings||[]).map(c=>`<details style="border-top:1px solid #EAEEF0;padding:7px 0"><summary style="cursor:pointer"><b>${esc(mName(c.period))}</b> · ${f(c.total)} € · ${c.rows} Aufrufe${c.missing&&c.missing.length?` · <span style="color:var(--red)">${c.missing.length} Beleg${c.missing.length>1?"e":""} fehlen</span>`:""}</summary>
+   <div style="padding:6px 0 0 14px;font-size:12px;line-height:1.7">${c.providers.map(p=>`<div><b>${esc(p.label)}</b> ${f(p.eur)} € (${p.billing==="rechnung"?"Monatsrechnung":"aus Guthaben"})${p.shares&&p.shares.length?" · "+p.shares.slice(0,6).map(s=>esc(s.name||s.ref)+" "+f(s.eur)+" €").join(" · "):""}${p.unassigned?" · allgemein "+f(p.unassigned)+" €":""}</div>`).join("")||"Kein Verbrauch."}
+   ${c.balances&&c.balances.length?`<div style="color:#6b7680">Guthaben laut Buch: ${c.balances.map(b=>esc(b.label)+" "+f(b.balance)+" €").join(" · ")}</div>`:""}</div></details>`).join("");
+  box.innerHTML=`<div style="margin-bottom:8px">${bill}</div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="btn bi bsm" onclick="App.runClose('${esc(d.next)}',false)">${esc(mName(d.next))} abschließen</button><button class="btn bg bsm" onclick="App.runClose('${cur}',true)">Zwischenstand ${esc(mName(cur))}</button></div>
+   ${rows||'<div style="color:#9AA4AC">Noch kein Monat abgeschlossen. Der erste Abschluss läuft automatisch am Monatsanfang.</div>'}`;
+ }catch(e){box.textContent="Monatsabschluss nicht ladbar: "+e.message;}
+},
+async runClose(period,force){
+ const billing={};document.querySelectorAll(".close-bill").forEach(s=>billing[s.dataset.prov]=s.value);
+ try{const r=await fetch(this.apiBase()+"/api/client/month-close",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({period,force:!!force,billing,mail:!force})});
+  const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  this.toast(d.already?"Dieser Monat ist schon abgeschlossen":"Abschluss "+period+" erstellt"+(d.created&&d.created.length?", "+d.created.length+" Ausgabe angelegt":""));
+  if(d.expenses)this._renderFinance(d);this.loadClosings();
+ }catch(e){this.toast("Fehler: "+e.message);}
+},
+editExp(id){
+ const box=document.getElementById("alloc-"+id);if(!box)return;
+ const e=(this._finExp||[]).find(x=>x.id===id);if(!e)return;
+ if(box.innerHTML){box.innerHTML="";return;}
+ box.innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;padding:8px;background:#F6F7F8;border-radius:8px;margin:4px 0 8px">
+  <div class="mf" style="margin:0"><label>Datum</label><input id="ee-date-${id}" type="date" value="${esc(e.date||"")}"></div>
+  <div class="mf" style="margin:0;width:110px"><label>Betrag €</label><input id="ee-amt-${id}" inputmode="decimal" value="${esc(String(e.amount).replace(".",","))}"></div>
+  <div class="mf" style="margin:0;flex:1;min-width:140px"><label>Anbieter</label><input id="ee-ven-${id}" value="${esc(e.vendor||"")}"></div>
+  <button class="btn bi bsm" onclick="App.saveExp('${id}')">Stimmt so</button></div>`;
+},
+async saveExp(id){
+ const v=k=>document.getElementById("ee-"+k+"-"+id)?.value||"";
+ try{const r=await fetch(this.apiBase()+"/api/client/expense-update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,date:v("date"),amount:v("amt"),vendor:v("ven")})});
+  const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");this._renderFinance(d);this.loadEconomics();this.toast("Ausgabe geprüft ✓");
+ }catch(e){this.toast("Fehler: "+e.message);}
 },
 async addExpense(){
  const key=localStorage.getItem("ww_api_key")||"";
@@ -2965,8 +3150,9 @@ rSettings(){
    <p class="hint" style="margin-bottom:10px">Dein Backend läuft auf Render unter <b>api.orendastudios.de</b>. Claude-Key, Pexels-Key, Cloudflare-Token – alles liegt dort als Environment Variable, nie im Browser. Hier nur die Backend-URL eintragen. Wenn dein Render-Service eine eigene Domain hat, diese verwenden.</p>
    <div class="mf"><label>Backend API URL</label><input id="c-api" placeholder="https://api.orendastudios.de" value="${esc(c.apiUrl||"https://api.orendastudios.de")}"></div>
    <button class="btn bg bsm" style="margin-top:6px" onclick="App.testBackend()">Backend jetzt testen</button>
-   <div class="mf" style="margin-top:12px"><label>Leitstand-Schlüssel (x-ww-key)</label><input id="c-wwkey" type="password" placeholder="= LEITSTAND_SECRET aus Render" value="${esc(localStorage.getItem('ww_api_key')||'')}"></div>
-   <div style="font-size:11px;color:#9AA4AC;margin-top:3px;line-height:1.5">Pflicht für Cloud-Sync, Factory-Runs &amp; Deploy-Downloads. Wert = die Render-Variable <code>LEITSTAND_SECRET</code> (Render → Service → Environment). Danach „Alles speichern" + Seite neu laden.</div>
+   ${(()=>{const i=window.LsAuth&&LsAuth.info();return`<div class="mf" style="margin-top:12px"><label>Anmeldung</label><div style="font-size:13px;line-height:1.6">${i?`Angemeldet als <b>${esc(i.email)}</b> · gültig bis ${new Date(i.exp).toLocaleDateString("de-DE")}`:"Nicht angemeldet"}</div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn bg bsm" onclick="LsAuth.logout(false)">Abmelden</button><button class="btn bg bsm" onclick="LsAuth.logout(true)">Alle Geräte abmelden</button></div>
+   <div style="font-size:11px;color:#9AA4AC;margin-top:5px;line-height:1.5">Anmeldung nur per Code an lukas@orendastudios.de. Jede neue Anmeldung meldet sich per Mail.</div>`})()}
   </div>
   <div class="cfg-sec">
    <div class="stit" style="color:var(--a);font-size:11px">🛡️ DATENSICHERUNG</div>
@@ -3071,8 +3257,7 @@ async saveSettings(){
  const g=id=>document.getElementById(id)?.value.trim()||"";
  Object.assign(this.cfg,{apiUrl:g("c-api"),pexKey:g("c-pex"),cfAccount:g("c-cfa"),cfProject:g("c-cfp"),cfToken:g("c-cft"),pingenKey:g("c-pgk"),pingenOrg:g("c-pgo"),n8nWebhook:g("c-n8n"),absFirma:g("c-fn"),absName:g("c-nn"),absStrasse:g("c-str"),absOrt:g("c-ort"),absTel:g("c-tel"),absMail:g("c-mail"),sbUrl:g("c-sbu"),sbKey:g("c-sbk")});
  localStorage.setItem("ww:cfg",JSON.stringify(this.cfg));
- // Leitstand-Schlüssel (x-ww-key) separat in localStorage — der fetch-Wrapper liest ihn dort.
- const _wk=g("c-wwkey"); if(_wk)localStorage.setItem("ww_api_key",_wk); else localStorage.removeItem("ww_api_key");
+ // Anmeldung (x-ww-key = Sitzungs-Token) wird über LsAuth verwaltet, nicht über dieses Formular.
  // IMMER zuerst echten Cloud-State laden (über Backend, auch ohne Dashboard-Credentials)
  const cloudState=await this.sbLoadViaBackend()||(this.cfg.sbUrl&&this.cfg.sbKey?await this.sbLoad():null);
  if(cloudState&&(cloudState.leads?.length||cloudState.clients?.length)){
@@ -3100,7 +3285,7 @@ async testBackend(){
 expState(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(this.state,null,2)],{type:"application/json"}));a.download="ww-backup-"+today()+".json";a.click();},
 impState(file){if(!file)return;const r=new FileReader();r.onload=()=>{try{this.state=JSON.parse(r.result);delete this.state.__rev;/* Import = bewusstes Überschreiben, kein Zusammenführen */this.persist();this.renderAll();this.toast("Backup importiert ✓")}catch(e){this.toast("Ungültige Datei")}};r.readAsText(file);}
 };
-App.init();
+LsAuth.start();
 </script>
 <!-- ══ In-App-Hilfe (isoliert, additiv — rührt die App-Logik nicht an) ══ -->
 <div id="wwHelpOv" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(20,20,24,.5);backdrop-filter:blur(2px)" onclick="if(event.target===this)wwHelpClose()">
