@@ -1043,7 +1043,7 @@ applyMove(){
   const lead=s.leads.find(l=>l.id===m.id);ev.entity=lead.name;Object.assign(lead,m.vals,{stage:m.to});
   const nx={letter_sent:["Klick-Tracking + Wiedervorlage",10],engaged:["Rückruf (SLA 1h)",0],offer_sent:["Angebot nachfassen",3],nurture:["Wiedervorlage",90],in_conversation:["Follow-up senden",2]}[m.to];
   if(nx)lead.next={label:nx[0],due:dP(nx[1])};
-  if(m.to==="won"){wonLead=lead;s.clients.unshift({id:uid(),name:lead.name,branche:lead.branche,ort:lead.ort,phase:"onboarding",health:75,mrr:+m.vals.mrr||0,paket:m.vals.paket||"Premium",auftragswert:+m.vals.auftragswert||0,website:lead.website||"",email:lead.email||"",portalEmail:lead.email||"",phone:lead.phone||"",demoUrl:lead.demoUrl||"",twin:lead.twin||null,buildPages:lead.buildPages||1,next:{label:"Onboarding-Mail senden",due:today()}});s.events.push({id:uid(),ts:Date.now(),pipeline:"cli",from:"—",to:"onboarding",actor:"System",entity:lead.name,note:"Client-Akte aus Won erzeugt"});}
+  if(m.to==="won"){wonLead=lead;s.clients.unshift({id:uid(),leadId:lead.id,name:lead.name,branche:lead.branche,ort:lead.ort,phase:"onboarding",health:75,mrr:+m.vals.mrr||0,paket:m.vals.paket||"Premium",auftragswert:+m.vals.auftragswert||0,website:lead.website||"",email:lead.email||"",portalEmail:lead.email||"",phone:lead.phone||"",demoUrl:lead.demoUrl||"",twin:lead.twin||null,buildPages:lead.buildPages||1,next:{label:"Onboarding-Mail senden",due:today()}});s.events.push({id:uid(),ts:Date.now(),pipeline:"cli",from:"—",to:"onboarding",actor:"System",entity:lead.name,note:"Client-Akte aus Won erzeugt"});}
  }else{
   const c=s.clients.find(x=>x.id===m.id);ev.entity=c.name;Object.assign(c,m.vals,{phase:m.to});
   if(m.to==="at_risk")c.health=Math.min(c.health,45);
@@ -1765,6 +1765,7 @@ renderDrawer(){
     <div class="stit">Build & Deploy</div>
     <div class="infobox" style="margin-bottom:9px">
      <div class="row"><div class="key">Build</div><div class="val">${hasBuild?`✅ ${item.buildPages||0} Seiten · ${buildKb}KB`:"❌ nicht vorhanden"}</div></div>
+     <div class="row"><div class="key">Verbrauch gesamt</div><div class="val" id="usage-${item.id}"><span style="color:#9AA4AC">lade …</span><img src="data:," alt="" style="display:none" onerror="this.onerror=null;App.loadUsageFor('${item.id}')"></div></div>
      ${item.buildCost?.eur!=null?`<div class="row"><div class="key">Kosten (Lauf)</div><div class="val"><span style="font-weight:700;font-family:ui-monospace,monospace;color:${item.buildCost.eur<=2?"var(--g)":item.buildCost.eur<=4?"var(--amb)":"var(--red)"}">${item.buildCost.eur.toFixed(2)} €</span> <span style="font-size:10px;color:#9AA4AC">${item.buildCost.calls} Calls · ${Math.round((item.buildCost.outTok||0)/1000)}k out</span></div></div>`:""}
      <div class="row"><div class="key">Design Pack</div><div class="val">${esc(item.designPack||"–")}</div></div>
      <div class="row"><div class="key">Branch</div><div class="val">${esc(bc?.branchCategory||"–")}</div></div>
@@ -2615,6 +2616,11 @@ rFinanzen(){
    ${openInv.map(({i,c})=>{const age=i.ts?Math.floor((Date.now()-i.ts)/864e5):null;const od=age!=null&&age>14;return `<button class="fi" onclick="App.openDetail('cli','${c.id}')"><span style="color:${od?'var(--red)':'var(--a)'}">●</span><span class="ft">${esc(c.name)} · ${fmt(i.amount)} €</span><span class="fc" style="${od?'color:var(--red)':''}">${i.number?esc(i.number)+' · ':''}${age!=null?(od?age+' T. überfällig':'vor '+age+' T.'):'offen'}</span><span style="color:#C5CCD1">›</span></button>`;}).join("")}
   </div></div>`:''}
   <div class="panel"><div class="cfg-sec">
+   <div class="stit" style="color:var(--a);font-size:11px">💶 KOSTEN &amp; ERTRAG JE KUNDE</div>
+   <p class="hint" style="margin-bottom:10px">Was jeder Kunde und Lead uns gekostet hat: gemessener Verbrauch (KI, Bilder, Filme, 3D, automatisch erfasst) plus aufgeteilte Rechnungen, gegen Einnahmen und offene Angebote.</p>
+   <div id="fin-econ" style="font-size:13px;color:var(--muted)">Lade …</div>
+  </div></div>
+  <div class="panel"><div class="cfg-sec">
    <div class="stit" style="color:var(--a);font-size:11px">📊 EÜR — EINNAHMEN-ÜBERSCHUSS (vereinfacht, Ist-Prinzip)</div>
    <p class="hint" style="margin-bottom:10px">Einnahmen = bezahlte Rechnungen · Ausgaben = unten erfasst · Gewinn = Differenz je Jahr. Überblick für dich &amp; den Steuerberater — die offizielle EÜR macht dein Steuerbüro.</p>
    <div id="fin-euer" style="font-size:13px;color:var(--muted)">Lade …</div>
@@ -2632,8 +2638,10 @@ rFinanzen(){
    </div>
    <div class="cfg-g2">
     <div class="mf"><label>Wiederkehr</label><select id="ex-rec" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"><option value="einmalig">Einmalig</option><option value="monatlich">Monatlich</option><option value="jaehrlich">Jährlich</option></select></div>
-    <div class="mf"><label>Kunde zuordnen (optional)</label><select id="ex-client" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"><option value="">— keiner (allgemein) —</option>${(this.state.clients||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+    <div class="mf"><label>Zuordnung</label><select id="ex-mode" onchange="App._allocMode('ex')" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"><option value="allgemein">Allgemein (Agentur)</option><option value="anteile">Auf Kunden/Leads aufteilen (%)</option><option value="verbrauch">KI-/Medien-Guthaben (nach gemessenem Verbrauch)</option></select></div>
    </div>
+   <div id="ex-allocbox" style="display:none;margin:-2px 0 10px">${this._allocEditor('ex',[])}</div>
+   <div id="ex-provbox" class="mf" style="display:none"><label>Anbieter des Guthabens</label><select id="ex-prov" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px"><option value="fal">fal (Bilder, Filme, 3D)</option><option value="anthropic">Anthropic (Claude)</option><option value="meshy">Meshy (3D)</option><option value="mistral">Mistral</option></select><div class="hint" style="margin-top:4px">Wird nicht prozentual verteilt: jeder Kunde trägt, was er laut Verbrauchs-Buch tatsächlich verbraucht hat. Daraus rechnet der Leitstand auch das Restguthaben.</div></div>
    <div class="mf"><label>Notiz (optional)</label><input id="ex-note" placeholder="Verwendungszweck"></div>
    <div class="mf"><label>Beleg (optional — Bild/PDF)</label><input id="ex-receipt" type="file" accept="image/*,application/pdf" style="font-size:12px"></div>
    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:2px"><button class="btn bi" onclick="App.addExpense()">+ Ausgabe erfassen</button><button class="btn bg" onclick="App.exportFinanceCSV()" title="Ausgaben + EÜR als CSV (Excel/Steuerberater)">⬇ CSV-Export</button></div>
@@ -2760,8 +2768,79 @@ _renderFinance(d){
  }
  if(list){
   const exp=(d.expenses||[]);
-  list.innerHTML='<div style="font-size:11px;text-transform:uppercase;color:#9AA4AC;margin-bottom:6px">Erfasste Ausgaben ('+exp.length+') · gesamt '+fmt(d.totalExpense||0)+' €</div>'+(exp.length?exp.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #EAEEF0"><div style="flex:none;width:82px;color:#9AA4AC;font-size:12px">${esc(e.date||"")}</div><div style="flex:1;min-width:0"><b>${fmt(e.amount)} €</b> · ${esc(e.category||"")}${e.vendor?' · '+esc(e.vendor):''}${e.recurring&&e.recurring!=='einmalig'?' <span style="background:#efe7d4;color:#8a6d2f;border-radius:4px;padding:1px 5px;font-size:10px">↻ '+esc(e.recurring)+'</span>':''}${e.clientId?' · 👤 '+esc(((this.state.clients||[]).find(c=>c.id===e.clientId)||{}).name||'Kunde'):''}${e.receiptUrl?' · <a href="'+esc(e.receiptUrl)+'" target="_blank" rel="noopener" style="color:var(--a)">📎 Beleg</a>':''}${e.note?`<div style="font-size:12px;color:#9AA4AC">${esc(e.note)}</div>`:''}</div><button class="btn bg bsm" title="Löschen" onclick="App.delExpense('${e.id}')" style="flex:none">✕</button></div>`).join(""):'<div style="color:#9AA4AC">Noch keine Ausgaben erfasst.</div>');
+  list.innerHTML='<div style="font-size:11px;text-transform:uppercase;color:#9AA4AC;margin-bottom:6px">Erfasste Ausgaben ('+exp.length+') · gesamt '+fmt(d.totalExpense||0)+' €</div>'+(exp.length?exp.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #EAEEF0"><div style="flex:none;width:82px;color:#9AA4AC;font-size:12px">${esc(e.date||"")}</div><div style="flex:1;min-width:0"><b>${fmt(e.amount)} €</b> · ${esc(e.category||"")}${e.vendor?' · '+esc(e.vendor):''}${e.recurring&&e.recurring!=='einmalig'?' <span style="background:#efe7d4;color:#8a6d2f;border-radius:4px;padding:1px 5px;font-size:10px">↻ '+esc(e.recurring)+'</span>':''}${this._allocLabel(e)}${e.receiptUrl?' · <a href="'+esc(e.receiptUrl)+'" target="_blank" rel="noopener" style="color:var(--a)">📎 Beleg</a>':''}${e.note?`<div style="font-size:12px;color:#9AA4AC">${esc(e.note)}</div>`:''}</div><button class="btn bg bsm" title="Auf Kunden aufteilen" onclick="App.editAlloc('${e.id}')" style="flex:none">% Aufteilen</button><button class="btn bg bsm" title="Löschen" onclick="App.delExpense('${e.id}')" style="flex:none">✕</button></div><div id="alloc-${e.id}"></div>`).join(""):'<div style="color:#9AA4AC">Noch keine Ausgaben erfasst.</div>');
  }
+},
+_allocSubjects(){
+ const cl=(this.state.clients||[]).map(c=>({ref:"c:"+c.id,name:c.name,kind:"Kunde"}));
+ const ld=(this.state.leads||[]).filter(l=>l.demoUrl||(l.offers||[]).length||l.buildCost).map(l=>({ref:"l:"+l.id,name:l.name,kind:"Lead"}));
+ return [...cl,...ld];
+},
+_allocEditor(px,alloc){
+ const subs=this._allocSubjects();
+ const row=(a,i)=>`<div class="alloc-row" style="display:flex;gap:6px;align-items:center;margin-top:6px"><select data-ref style="flex:1;min-width:0;border:1px solid #CBD2D6;border-radius:6px;padding:6px 8px;font-size:13px"><option value="">— wählen —</option>${subs.map(s=>`<option value="${s.ref}"${a&&a.ref===s.ref?" selected":""}>${esc(s.name)} · ${s.kind}</option>`).join("")}</select><input data-pct inputmode="decimal" value="${a?a.pct:""}" placeholder="%" style="width:64px;border:1px solid #CBD2D6;border-radius:6px;padding:6px 8px;font-size:13px"><span style="font-size:12px;color:#9AA4AC">%</span><button class="btn bg bsm" type="button" onclick="this.parentNode.remove();App._allocSum('${px}')">✕</button></div>`;
+ const list=(alloc&&alloc.length?alloc:[null]).map(row).join("");
+ return `<div id="${px}-alloc" oninput="App._allocSum('${px}')" onchange="App._allocSum('${px}')">${list}</div><div style="display:flex;gap:10px;align-items:center;margin-top:6px"><button class="btn bg bsm" type="button" onclick="App._allocAdd('${px}')">+ weiterer Kunde</button><button class="btn bg bsm" type="button" onclick="App._allocEven('${px}')">gleich verteilen</button><span id="${px}-allocsum" style="font-size:12px;color:#9AA4AC"></span></div>`;
+},
+_allocAdd(px){const box=document.getElementById(px+"-alloc");if(!box)return;const tmp=document.createElement("div");tmp.innerHTML=this._allocEditor(px,[]);box.appendChild(tmp.querySelector(".alloc-row"));},
+_allocEven(px){const rows=[...document.querySelectorAll("#"+px+"-alloc .alloc-row")].filter(r=>r.querySelector("[data-ref]").value);if(!rows.length)return;const p=Math.floor(10000/rows.length)/100;rows.forEach((r,i)=>r.querySelector("[data-pct]").value=i===rows.length-1?(Math.round((100-p*(rows.length-1))*100)/100):p);this._allocSum(px);},
+_allocRead(px){return [...document.querySelectorAll("#"+px+"-alloc .alloc-row")].map(r=>({ref:r.querySelector("[data-ref]").value,pct:+String(r.querySelector("[data-pct]").value).replace(",",".")||0})).filter(a=>a.ref&&a.pct>0);},
+_allocSum(px){const el=document.getElementById(px+"-allocsum");if(!el)return;const s=this._allocRead(px).reduce((a,x)=>a+x.pct,0);el.textContent=s?("Summe "+Math.round(s*100)/100+" %"+(s<100?" · Rest "+Math.round((100-s)*100)/100+" % bleibt allgemein":s>100?" · zu viel!":"")):"";el.style.color=s>100.001?"var(--red)":"#9AA4AC";},
+_allocMode(px){const m=document.getElementById(px+"-mode")?.value;const a=document.getElementById(px+"-allocbox"),p=document.getElementById(px+"-provbox");if(a)a.style.display=m==="anteile"?"block":"none";if(p)p.style.display=m==="verbrauch"?"block":"none";},
+_allocLabel(e){
+ const nm=ref=>{const[k,id]=String(ref).split(":");const s=(k==="c"?(this.state.clients||[]):(this.state.leads||[])).find(x=>x.id===id);return s?s.name:"?";};
+ if(e.mode==="verbrauch")return ` · <span style="background:#e4eef5;color:#3d6a85;border-radius:4px;padding:1px 5px;font-size:10px">nach Verbrauch · ${esc(e.provider||e.vendor||"")}</span>`;
+ const al=(e.alloc&&e.alloc.length)?e.alloc:(e.clientId?[{ref:"c:"+e.clientId,pct:100}]:[]);
+ return al.length?" · 👤 "+al.map(a=>esc(nm(a.ref))+(a.pct<100?" "+a.pct+" %":"")).join(", "):"";
+},
+editAlloc(id){
+ const e=((this._finance||{}).expenses||[]).find(x=>x.id===id);const box=document.getElementById("alloc-"+id);if(!e||!box)return;
+ if(box.innerHTML){box.innerHTML="";return;}
+ const px="ea"+id.replace(/[^a-z0-9]/gi,"");
+ const al=(e.alloc&&e.alloc.length)?e.alloc:(e.clientId?[{ref:"c:"+e.clientId,pct:100}]:[]);
+ const mode=e.mode||(al.length?"anteile":"allgemein");
+ box.innerHTML=`<div style="background:#f6f8f9;border-radius:8px;padding:10px;margin:4px 0 8px"><div class="mf"><label>Zuordnung</label><select id="${px}-mode" onchange="App._allocMode('${px}')" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px">${[["allgemein","Allgemein (Agentur)"],["anteile","Auf Kunden/Leads aufteilen (%)"],["verbrauch","KI-/Medien-Guthaben (nach Verbrauch)"]].map(([v,t])=>`<option value="${v}"${v===mode?" selected":""}>${t}</option>`).join("")}</select></div>
+  <div id="${px}-allocbox" style="display:${mode==="anteile"?"block":"none"}">${this._allocEditor(px,al)}</div>
+  <div id="${px}-provbox" class="mf" style="display:${mode==="verbrauch"?"block":"none"}"><label>Anbieter</label><select id="${px}-prov" style="width:100%;border:1px solid #CBD2D6;border-radius:6px;padding:7px 9px;font-size:13px">${["fal","anthropic","meshy","mistral"].map(v=>`<option${(e.provider||"")===v?" selected":""}>${v}</option>`).join("")}</select></div>
+  <div style="margin-top:8px"><button class="btn bi bsm" onclick="App.saveAlloc('${id}','${px}')">Zuordnung speichern</button></div></div>`;
+ this._allocSum(px);
+},
+async saveAlloc(id,px){
+ const key=localStorage.getItem("ww_api_key")||"";if(!key)return;
+ const mode=document.getElementById(px+"-mode").value,alloc=mode==="anteile"?this._allocRead(px):[];
+ if(mode==="anteile"&&alloc.reduce((a,x)=>a+x.pct,0)>100.001){this.toast("Anteile ergeben mehr als 100 %");return;}
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/expense-alloc",{method:"POST",headers:{"Content-Type":"application/json","x-ww-key":key},body:JSON.stringify({expenseId:id,mode,alloc,provider:document.getElementById(px+"-prov")?.value||""})});
+  const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  this._renderFinance(d);this.loadEconomics();this.toast("Zuordnung gespeichert ✓");
+ }catch(e){this.toast("Fehler: "+e.message);}
+},
+async loadEconomics(){
+ const box=document.getElementById("fin-econ");const key=localStorage.getItem("ww_api_key")||"";if(!box||!key)return;
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/economics",{headers:{"x-ww-key":key}});const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  this._econ=d;
+  const f=n=>(+n||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const col=n=>n>0?"var(--g)":n<0?"var(--red)":"inherit";
+  const pv=(d.providers||[]);
+  let h=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">`+
+   `<div style="flex:1;min-width:130px;background:#f6f8f9;border-radius:8px;padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#9AA4AC">Verbrauch diesen Monat</div><div style="font-size:18px;font-weight:700">${f(d.totals.month)} €</div></div>`+
+   pv.map(p=>`<div style="flex:1;min-width:150px;background:#f6f8f9;border-radius:8px;padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#9AA4AC">${esc(p.provider)} · ${p.n} Aufträge</div><div style="font-size:18px;font-weight:700">${f(p.total)} €</div><div style="font-size:11px;color:#9AA4AC">Monat ${f(p.month)} €${p.balance!=null?` · <b style="color:${p.balance<5?"var(--red)":"var(--g)"}">Restguthaben ≈ ${f(p.balance)} €</b>`:` · Aufladung als Ausgabe „nach Verbrauch" erfassen, dann siehst du das Restguthaben`}</div></div>`).join("")+`</div>`;
+  const rows=(d.subjects||[]);
+  h+=rows.length?`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:#9AA4AC;text-transform:uppercase;font-size:10px"><th style="padding:5px 4px">Kunde / Lead</th><th style="text-align:right">Verbrauch</th><th style="text-align:right">Umlage</th><th style="text-align:right">Einnahmen</th><th style="text-align:right">Angebot offen</th><th style="text-align:right">Marge</th></tr></thead><tbody>`+
+   rows.map(x=>`<tr style="border-top:1px solid #EAEEF0;cursor:pointer" onclick="App.openDetail('${x.kind==="kunde"?"cli":"acq"}','${x.id}')"><td style="padding:6px 4px">${esc(x.name)} <span style="font-size:10px;color:#9AA4AC">${x.kind==="kunde"?"Kunde":"Lead"}${x.ort?" · "+esc(x.ort):""}</span><div style="font-size:10px;color:#9AA4AC">${Object.entries(x.byProvider||{}).map(([k,v])=>esc(k)+" "+f(v)+" €").join(" · ")}${x.usageEst?" · davon geschätzt "+f(x.usageEst)+" €":""}</div></td><td style="text-align:right;color:var(--amb)">${f(x.usage)} €</td><td style="text-align:right;color:var(--amb)">${f(x.alloc)} €</td><td style="text-align:right;color:var(--g)">${f(x.income)} €</td><td style="text-align:right;color:#9AA4AC">${x.open?f(x.open)+" €":"–"}</td><td style="text-align:right;font-weight:700;color:${col(x.margin)}">${f(x.margin)} €${x.open&&x.income===0?`<div style="font-size:10px;font-weight:400;color:#9AA4AC">bei Annahme ${f(x.open-x.cost)} €</div>`:""}</td></tr>`).join("")+`</tbody></table>`
+   :`<div style="color:#9AA4AC">Noch kein Verbrauch erfasst. Ab jetzt landet jeder Factory-Lauf und jeder Medien-Auftrag hier beim jeweiligen Kunden.</div>`;
+  if(d.unassigned&&d.unassigned.n)h+=`<div style="font-size:11px;color:#9AA4AC;margin-top:8px">Ohne Kunde (eigene Website, Tests): ${f(d.unassigned.eur)} € in ${d.unassigned.n} Aufträgen.</div>`;
+  box.innerHTML=h;
+ }catch(e){box.textContent="Kostenübersicht nicht ladbar: "+e.message;}
+},
+async loadUsageFor(id){
+ const box=document.getElementById("usage-"+id);const key=localStorage.getItem("ww_api_key")||"";if(!box||!key)return;
+ try{
+  const r=await fetch(this.apiBase()+"/api/client/usage?id="+encodeURIComponent(id),{headers:{"x-ww-key":key}});const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  const f=n=>(+n||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});
+  box.innerHTML=d.n?`<b>${f(d.eur)} €</b> <span style="font-size:10px;color:#9AA4AC">${d.n} Aufträge${d.est?" · teils geschätzt":""}</span><div style="font-size:11px;color:#6b7680;margin-top:2px">${d.groups.map(g=>esc(g.label)+": "+f(g.eur)+" € ("+g.n+")").join(" · ")}</div>`:`<span style="color:#9AA4AC">noch nichts erfasst</span>`;
+ }catch(e){box.textContent="–";}
 },
 async loadFinance(){
  const key=localStorage.getItem("ww_api_key")||"";
@@ -2771,6 +2850,7 @@ async loadFinance(){
   const r=await fetch(this.apiBase()+"/api/client/finance",{headers:{"x-ww-key":key}});
   const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
   this._renderFinance(d);
+  this.loadEconomics();
  }catch(e){if(eur)eur.textContent="Finanzdaten nicht ladbar: "+e.message;}
 },
 async addExpense(){
@@ -2784,7 +2864,9 @@ async addExpense(){
   const fi=document.getElementById("ex-receipt");
   if(fi&&fi.files&&fi.files[0]){if(msg)msg.textContent="Lade Beleg hoch …";receiptUrl=await this.uploadReceipt(fi.files[0]);}
  }catch(e){if(msg)msg.textContent="Beleg-Upload fehlgeschlagen: "+e.message;this.toast("Beleg-Upload fehlgeschlagen");return;}
- const body={date:g("ex-date"),amount,category:g("ex-cat"),vendor:g("ex-vendor"),note:g("ex-note"),recurring:g("ex-rec")||"einmalig",clientId:g("ex-client")||"",receiptUrl};
+ const mode=g("ex-mode")||"allgemein",alloc=mode==="anteile"?this._allocRead("ex"):[];
+ if(mode==="anteile"){const sum=alloc.reduce((a,x)=>a+x.pct,0);if(!alloc.length){this.toast("Mindestens einen Kunden mit Anteil wählen");return;}if(sum>100.001){this.toast("Anteile ergeben mehr als 100 %");return;}}
+ const body={date:g("ex-date"),amount,category:g("ex-cat"),vendor:g("ex-vendor"),note:g("ex-note"),recurring:g("ex-rec")||"einmalig",mode,alloc,provider:mode==="verbrauch"?g("ex-prov"):"",receiptUrl};
  if(msg)msg.textContent="Speichere …";
  try{
   const r=await fetch(this.apiBase()+"/api/client/expense",{method:"POST",headers:{"Content-Type":"application/json","x-ww-key":key},body:JSON.stringify(body)});
