@@ -346,6 +346,7 @@ nav a.active{box-shadow:0 4px 12px rgba(26,37,48,.28)}
     <div class="view" id="v-protokoll"></div>
     <div class="view pad" id="v-wachstum"></div>
     <div class="view pad" id="v-finanzen"></div>
+    <div class="view pad" id="v-probelauf"></div>
     <div class="view pad" id="v-system"></div>
     <div class="view pad" id="v-einstellungen"></div>
   </main>
@@ -628,7 +629,7 @@ async reconnectTick(){
 async resetAll(){if(!confirm("Demo-Daten wiederherstellen?"))return;this.state=seed();this.persist();this.renderAll();this.toast("Zurückgesetzt");},
 
 renderNav(){
- const items=[["heute","⌂","Heute"],["akquise","⚙","Akquise"],["kunden","◉","Kunden"],["projekte","▦","Anfragen"],["wachstum","↗","Wachstum"],["finanzen","€","Finanzen"],["system","🛡","System"],["finder","◎","Lead-Finder"],["protokoll","≡","Protokoll"],["einstellungen","✦","Einstellungen"]];
+ const items=[["heute","⌂","Heute"],["akquise","⚙","Akquise"],["kunden","◉","Kunden"],["projekte","▦","Anfragen"],["probelauf","◐","Probeläufe"],["wachstum","↗","Wachstum"],["finanzen","€","Finanzen"],["system","🛡","System"],["finder","◎","Lead-Finder"],["protokoll","≡","Protokoll"],["einstellungen","✦","Einstellungen"]];
  document.getElementById("nav").innerHTML=items.map(([id,ic,l])=>`<a id="n-${id}" onclick="App.show('${id}')"><span class="ic">${ic}</span>${l}${id==="projekte"?`<span id="nav-badge-anfragen" style="display:none;margin-left:auto;background:var(--a);color:#fff;font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px;min-width:18px;text-align:center">0</span>`:""}</a>`).join("");
  this.updateInboxBadge();
 },
@@ -639,7 +640,7 @@ show(v){
  document.getElementById("v-"+v).classList.add("active");
  document.querySelectorAll("nav a").forEach(a=>a.classList.remove("active"));
  document.getElementById("n-"+v).classList.add("active");
- document.getElementById("vt").textContent={heute:"Heute",akquise:"Akquise",kunden:"Kunden",projekte:"Anfragen",wachstum:"Wachstum",finanzen:"Finanzen",system:"System",finder:"Lead-Finder",protokoll:"Protokoll",einstellungen:"Einstellungen"}[v];
+ document.getElementById("vt").textContent={heute:"Heute",akquise:"Akquise",kunden:"Kunden",projekte:"Anfragen",probelauf:"Probeläufe",wachstum:"Wachstum",finanzen:"Finanzen",system:"System",finder:"Lead-Finder",protokoll:"Protokoll",einstellungen:"Einstellungen"}[v];
  this.renderAll();
 },
 kpis(){const s=this.state,mrr=s.clients.filter(c=>!["former","offboarding"].includes(c.phase)).reduce((a,c)=>a+(+c.mrr||0),0),off=s.leads.filter(l=>["offer_sent","negotiation"].includes(l.stage)).reduce((a,l)=>a+(+l.angebotswert||0),0);const anfrDone=["freigeschaltet","erledigt","abgelehnt","beantwortet"];const anfr=s.clients.reduce((a,c)=>a+(c.careRequests||[]).filter(q=>!anfrDone.includes(q.status)).length+(c.assistantHandoffs||[]).filter(h=>!anfrDone.includes(h.status)).length,0);let fbUp=0,fbDown=0;s.clients.forEach(c=>(c.changeRequests||[]).forEach(r=>{if(r.feedback){if(r.feedback.rating==="up")fbUp++;else fbDown++;}}));return{mrr,off,sr:s.leads.filter(l=>l.stage==="sales_ready").length,ar:s.clients.filter(c=>c.phase==="at_risk").length,anfr,fbUp,fbDown};},
@@ -654,12 +655,37 @@ renderAll(){
  else if(this.view==="kunden")this.rBoard("kunden");
  else if(this.view==="projekte")this.rProjekte();
  else if(this.view==="finder")this.rFinder();
+ else if(this.view==="probelauf")this.rProbelauf();
  else if(this.view==="wachstum")this.rWachstum();
  else if(this.view==="finanzen")this.rFinanzen();
  else if(this.view==="system")this.rSystem();
  else if(this.view==="protokoll")this.rLog();
  else if(this.view==="einstellungen")this.rSettings();
 },
+// Probeläufe: Vorschau-Bestellungen über die Website. Bestätigen (Zahlung/gratis/Test), Fortschritt, prüfen, freigeben, neu starten.
+async rProbelauf(){
+ const el=document.getElementById("v-probelauf");if(!el)return;
+ el.innerHTML=`<div style="max-width:980px"><div class="panel"><div class="cfg-sec"><div class="stit" style="color:var(--a);font-size:11px">🧪 PROBELÄUFE · VORSCHAU-BESTELLUNGEN</div><p class="hint">Bestellungen von orendastudios.de/probelauf. Erst bestätigen (Zahlung eingegangen, gratis oder Test), dann baut die Factory. Fertige Vorschauen prüfst du und gibst sie frei: erst dann bekommt der Betrieb die Mail.</p><div id="pv-list" style="font-size:13px;color:var(--muted)">Lade …</div></div></div></div>`;
+ try{const r=await fetch(this.apiBase()+"/api/admin/preview/orders");const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");
+  const L={neu:["Neu, unbestätigt","#9AA4AC"],bezahlt:["Bestätigt, startet","var(--amb)"],building:["Baut","var(--amb)"],pruefung:["Wartet auf deine Prüfung","var(--a)"],ready:["Freigegeben","var(--g)"],fehler:["Abgebrochen","var(--red)"]};
+  const rows=(d.orders||[]).map(o=>{const s=L[o.status]||[o.status,"#9AA4AC"];const pr=o.progress?` · Schritt ${o.progress.step}/${o.progress.of}: ${esc(o.progress.label)}`:"";
+   const act=[];
+   if(o.status==="neu"){act.push(`<button class="btn bi bsm" onclick="App.pvConfirm('${o.id}','ueberweisung')">Zahlung eingegangen</button>`,`<button class="btn bg bsm" onclick="App.pvConfirm('${o.id}','gratis')">Gratis starten</button>`,`<button class="btn bg bsm" onclick="App.pvConfirm('${o.id}','test')">Test</button>`);}
+   if(o.previewUrl)act.push(`<a class="btn bg bsm" href="${esc(o.previewUrl)}" target="_blank" rel="noopener">Vorschau ansehen</a>`);
+   if(o.status==="pruefung")act.push(`<button class="btn bi bsm" onclick="App.pvRelease('${o.id}')">Freigeben und mailen</button>`);
+   if(["fehler","pruefung"].includes(o.status))act.push(`<button class="btn bg bsm" onclick="App.pvRetry('${o.id}')">Neu bauen</button>`);
+   if(o.leadId)act.push(`<button class="btn bg bsm" onclick="App.openDetail('acq','${o.leadId}')">Lead</button>`);
+   return `<div style="padding:12px 0;border-top:1px solid #EAEEF0"><div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><b style="font-size:14px">${esc(o.betrieb)}</b><span style="color:${s[1]};font-weight:700;font-size:12px">● ${s[0]}${pr}</span><span style="margin-left:auto;color:#9AA4AC;font-size:12px">${esc(o.tierName||o.tier)} · ${o.amount} € · ${esc(o.paymentMethod||o.paymentStatus||"")} · ${new Date(o.createdAt).toLocaleDateString("de-DE")}</span></div><div style="color:#6b7680;font-size:12px;margin:3px 0 8px">${esc(o.email||"")}${o.ort?" · "+esc(o.ort):""}${o.branche?" · "+esc(o.branche):""}${o.website?" · "+esc(o.website):""}</div><div style="display:flex;gap:6px;flex-wrap:wrap">${act.join("")}</div></div>`;}).join("");
+  document.getElementById("pv-list").innerHTML=rows||"Noch keine Bestellungen.";
+  clearTimeout(this._pvT);if(this.view==="probelauf"&&(d.orders||[]).some(o=>["bezahlt","building"].includes(o.status)))this._pvT=setTimeout(()=>{if(this.view==="probelauf")this.rProbelauf();},30000);
+ }catch(e){const l=document.getElementById("pv-list");if(l)l.textContent="Nicht ladbar: "+e.message;}
+},
+async pvConfirm(id,method){if(!confirm(method==="ueberweisung"?"Zahlung ist eingegangen? Dann startet die Factory.":"Probelauf "+(method==="gratis"?"gratis":"als Test")+" starten?"))return;
+ try{const r=await fetch(this.apiBase()+"/api/admin/preview/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderId:id,method})});const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");this.toast("Factory startet");this.rProbelauf();}catch(e){this.toast("Fehler: "+e.message);}},
+async pvRetry(id){if(!confirm("Vorschau neu bauen? Das kostet erneut KI-Guthaben."))return;
+ try{const r=await fetch(this.apiBase()+"/api/admin/preview/retry",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderId:id})});const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");this.toast("Neuer Lauf gestartet");this.rProbelauf();}catch(e){this.toast("Fehler: "+e.message);}},
+async pvRelease(id){if(!confirm("Vorschau freigeben? Der Betrieb bekommt sofort die Mail mit dem Link."))return;
+ try{const r=await fetch(this.apiBase()+"/api/admin/preview/release",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderId:id})});const d=await r.json();if(!d.ok)throw new Error(d.error||"Fehler");this.toast(d.mailed?"Freigegeben und gemailt":"Freigegeben (Mail nicht raus)");this.rProbelauf();}catch(e){this.toast("Fehler: "+e.message);}},
 genReferralCodes(){
  const slug=n=>String(n||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,12)||"kunde";
  let n=0;(this.state.clients||[]).forEach(c=>{if(!c.referralCode){c.referralCode=slug(c.name)+"-"+Math.random().toString(36).slice(2,6);c.referrals=c.referrals||[];n++;}});
